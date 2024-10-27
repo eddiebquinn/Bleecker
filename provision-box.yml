@@ -3,6 +3,13 @@
   hosts: all
   become: true
   tasks:
+  
+    - name: Create semaphore-agent user
+      ansible.builtin.user:
+        name: semaphore-agent
+        groups: sudo
+        state: present
+        shell: /bin/bash
 
     - name: Ensure semaphore-agent user exists
       ansible.builtin.user:
