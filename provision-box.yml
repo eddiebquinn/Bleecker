@@ -4,12 +4,13 @@
   become: true
   tasks:
 
-    - name: Create semaphore-agent user
+    - name: Create semaphore-agent user with password
       ansible.builtin.user:
         name: semaphore-agent
         groups: sudo
         state: present
         shell: /bin/bash
+        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') }}"
 
     - name: Ensure semaphore-agent user exists
       ansible.builtin.user:
