@@ -4,6 +4,14 @@
   become: true
   tasks:
   
+    - name: Test sudo access
+      command: whoami
+      register: sudo_test
+      become: true
+
+    - debug:
+        msg: "Sudo access works, user is {{ sudo_test.stdout }}"
+
     - name: Create semaphore-agent user
       ansible.builtin.user:
         name: semaphore-agent
