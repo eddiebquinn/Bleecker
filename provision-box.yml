@@ -1,0 +1,46 @@
+---
+- name: Setup semaphore-agent user and secure SSH
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Ensure semaphore-agent user exists
+      ansible.builtin.user:
+        name: semaphore-agent
+        state: present
+        groups: sudo
+        shell: /bin/bash
+
+    - name: Create .ssh directory for semaphore-agent
+      ansible.builtin.file:
+        path: /home/semaphore-agent/.ssh
+        state: directory
+        owner: semaphore-agent
+        group: semaphore-agent
+        mode: '0700'
+
+    - name: Add SSH key to semaphore-agent's authorized_keys
+      ansible.builtin.copy:
+        content: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDV4fxm2cfZ7Y2yic4MbIDYnugokmV5mNxh4ndsegFQoPiebm7kRt/iMycGo74TUAGPKJr5cIycIlqPfyV32+By9RfukOugeXOz1GRn5Y1LBV3aaHKW7sczO+eUILTnESCjSp/yMWBXy9eYf2WzM0b9xhhVSY8MN7oBzfpVASJGpmwqd1n8ozr9qkSYqn1cOT4VwvKFp502AtLP2J9hN3GkBU1pGa45diY84QiAo9Ctb64aiSPPYXHPd88bywVYPKaB1z0AQqSqCxF5f8GQso08eUEDm1n+GTyQs2ZEh+1RhQCZKNhIPNDEpg4RrF8nHd1m2jrgu5yxLQ/PnHHBt+24yLJ0wqlbtHLAlWBAK1gd+ervtvirp5BJdpxCG7iidUlfMvgefL5a6X/zjuJ//d1gci6+q49wstwX8PnSbTzQJmibVDRsqW2PU7IMZaCRwvZ/6q8q/B46qBmMF3LoUyCTgW9Hnhp3SIcxV2DO2uj6wCDfi0EsUcs5A/K7HHTEm98= semaphore-agent@samba-1\n"
+        dest: /home/semaphore-agent/.ssh/authorized_keys
+        owner: semaphore-agent
+        group: semaphore-agent
+        mode: '0600'
+
+    - name: Configure SSH to disable root login and only allow public key authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        backrefs: yes
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+      notify: Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
