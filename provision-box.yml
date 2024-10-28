@@ -10,7 +10,7 @@
         groups: sudo
         state: present
         shell: /bin/bash
-        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') }}"
+        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') | password_hash('sha512') }}"
 
     - name: Ensure semaphore-agent user exists
       ansible.builtin.user:
