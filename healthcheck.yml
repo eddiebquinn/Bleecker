@@ -1,0 +1,56 @@
+- name: Basic health checks
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Update and upgrade APT packages
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: dist
+      notify: Reboot if required
+
+    - name: Create eddie user with password
+      ansible.builtin.user:
+        name: eddie
+        groups: sudo
+        state: present
+        shell: /bin/bash
+        password: "{{ lookup('env', 'EDDIE_PASSWORD') | password_hash('sha512') }}"
+
+    - name: Create .ssh directory for eddie
+      ansible.builtin.file:
+        path: /home/eddie/.ssh
+        state: directory
+        owner: eddie
+        group: eddie
+        mode: '0700'
+
+    - name: Add SSH key to eddie's authorized_keys
+      ansible.builtin.copy:
+        content: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC+3hOGkZlS8Y/svftuhz8GliY+A0aePxMhyb42vrZshLQ1DMUBXw695+Sc6AWPdCDbszcyq3hPzH2EPMUUVLbgVzx3NNSZh/zzlugV/SMrQTrhiCB1IqOq7msinqxNhT8D/b+sNwgM2rVhJZqwCFOcImNBufmyh+0ILWsEHu+/1KDhcTVt1KW3WqJJSt+RipSNLfrEdFvpHVZK2ml4voE56bXMfEAAKDHbsW2N/NZDPgXBFeQ6OZZIBnpHEDaiEjxlM/i4OmQB+MnQ8otDRL+7Shw+u/PXYjuiTbKOZ4TjHYOUC6YSrstAFI0H4d8HMZhjA/x5aT9fLPKBcTd31vNphC1D75L+tk9TqbfhfLZsZLHKNWBKp86qJsNKnKGHd5JpA4sQIH4Tj63ZMVryucd+hS7PLMlx3nhUg/nAiBIslZzPyAYUEn2h+evIgIWE0gYFt1lRZPGObp9ntFzxIZqxUqmzn40oqEgogaAmg3aAm5hwigohzlzfRhr8AXZjANs= eddie@two-face\n"
+        dest: /home/eddie/.ssh/authorized_keys
+        owner: eddie
+        group: eddie
+        mode: '0600'
+
+    - name: Configure SSH to disable root login and only allow public key authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        backrefs: yes
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+      notify: Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+
+    - name: Reboot if required
+      ansible.builtin.reboot:
+      when: ansible_facts['pkg_mgr'] == 'apt' and ansible_facts['needs_restarting'] == 'reboot-required'
