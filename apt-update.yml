@@ -1,0 +1,10 @@
+- name: APT update
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Update and upgrade APT packages
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: dist
+      notify: Reboot if required
