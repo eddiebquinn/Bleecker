@@ -12,13 +12,6 @@
         shell: /bin/bash
         password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') | password_hash('sha512') }}"
 
-    - name: Ensure semaphore-agent user exists
-      ansible.builtin.user:
-        name: semaphore-agent
-        state: present
-        groups: sudo
-        shell: /bin/bash
-
     - name: Create .ssh directory for semaphore-agent
       ansible.builtin.file:
         path: /home/semaphore-agent/.ssh
@@ -34,21 +27,3 @@
         owner: semaphore-agent
         group: semaphore-agent
         mode: '0600'
-
-    - name: Configure SSH to disable root login and only allow public key authentication
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        state: present
-        backrefs: yes
-      loop:
-        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
-        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
-      notify: Restart SSH
-
-  handlers:
-    - name: Restart SSH
-      ansible.builtin.service:
-        name: sshd
-        state: restarted
