@@ -1,6 +1,6 @@
 ---
 - name: Install packages using apt
-  hosts: your_target_hosts
+  hosts: all
   become: yes
   become_method: sudo
   vars:
