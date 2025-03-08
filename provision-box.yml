@@ -2,6 +2,10 @@
 - name: Setup semaphore-agent user and secure SSH
   hosts: all
   become: true
+  become_method: sudo
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
   tasks:
 
     - name: Create semaphore-agent user with password
