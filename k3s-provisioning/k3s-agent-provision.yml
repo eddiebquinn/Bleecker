@@ -16,6 +16,22 @@
         shell: /bin/bash
         password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
 
+    - name: Create .ssh directory for k3s-agent
+      ansible.builtin.file:
+        path: /home/k3s-agent/.ssh
+        state: directory
+        owner: k3s-agent
+        group: k3s-agent
+        mode: '0700'
+
+    - name: Add SSH key to k3s-agent's authorized_keys
+      ansible.builtin.copy:
+        content: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPJSTK/xH3KfOJsQQia/noWWB8K/ZvXLWnrUR9tLCvV k3s-agent@local\n"
+        dest: /home/k3s-agent/.ssh/authorized_keys
+        owner: k3s-agent
+        group: k3s-agent
+        mode: '0600'
+
     - name: Grant k3s-agent passwordless sudo for k3sup
       ansible.builtin.copy:
         dest: /etc/sudoers.d/k3s-agent
