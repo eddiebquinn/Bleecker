@@ -1,0 +1,17 @@
+---
+- name: Create k3s-agent user
+  hosts: all
+  become: true
+  become_method: sudo
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+
+    - name: Create k3s-agent user with password
+      ansible.builtin.user:
+        name: k3s-agent
+        groups: sudo
+        state: present
+        shell: /bin/bash
+        password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
