@@ -14,7 +14,7 @@
         groups: sudo
         state: present
         shell: /bin/bash
-        password: "{{ lookup('env', 'EDDIE_PASSWORD') | password_hash('sha512', 'random_salt') }}"
+        password: "{{ lookup('env', 'EDDIE_PASSWORD') | password_hash('sha512') }}"
 
     - name: Create .ssh directory for eddie
       ansible.builtin.file:
