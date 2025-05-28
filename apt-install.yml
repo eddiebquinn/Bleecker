@@ -8,11 +8,12 @@
 
   tasks:
     - name: Update apt package cache
-      apt:
+      ansible.builtin.apt:
         update_cache: yes
 
-    - name: Install vim
-      apt:
-        name: vim
+    - name: Install vim and curl
+      ansible.builtin.apt:
+        name:
+          - vim
+          - curl
         state: present
-
