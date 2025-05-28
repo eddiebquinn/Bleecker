@@ -1,5 +1,5 @@
 ---
-- name: Create k3s-agent user
+- name: Create k3s-agent user and grant passwordless sudo
   hosts: all
   become: true
   become_method: sudo
@@ -15,3 +15,14 @@
         state: present
         shell: /bin/bash
         password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
+
+    - name: Grant k3s-agent passwordless sudo for k3sup
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/k3s-agent
+        content: "k3s-agent ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: 'visudo -cf %s'
+        # This sudoers entry is required for k3sup to install and manage k3s
+        # It allows the k3s-agent user to execute sudo commands without a password
