@@ -1,0 +1,51 @@
+all:
+  children:
+    docker-hosts:
+      hosts:
+        matrix-1:
+          ansible_host: 10.0.4.2
+          mac: bc:24:11:9a:66:12
+        jellyfin-1:
+          ansible_host: 10.0.1.4
+          mac: bc:24:11:9e:8c:ec
+        vikunja-1:
+          ansible_host: 10.0.4.1
+          mac: bc:24:11:95:a0:b4
+        tidarr-1:
+          ansible_host: 10.0.2.146
+          mac: bc:24:11:e2:9a:f2
+        appstack-1:
+          ansible_host: 10.0.3.77
+          mac: bc:24:11:0e:f4:00
+        arrstack-1:
+          ansible_host: 10.0.2.200
+          mac: bc:24:11:b9:ef:07
+        devstack-1:
+          ansible_host: 10.0.1.116
+          mac: bc:24:11:c3:cc:26
+        infstack-1:
+          ansible_host: 10.0.1.37
+          mac: bc:24:11:95:84:77
+        mediastack-1:
+          ansible_host: 10.0.3.26
+          mac: bc:24:11:31:be:43
+    core_infra:
+      hosts:
+        arasaka-1:
+          ansible_host: 10.0.1.1
+          mac: bc:30:5b:ed:68:5d
+        datafortress-1:
+          ansible_host: 10.0.1.199
+          mac: ec:f4:bb:c7:0c:c0
+    singular-hosts:
+      hosts:
+        vikunja-1:
+          ansible_host: 10.0.4.1
+          mac: bc:24:11:95:a0:b4
+        tidarr-1:
+          ansible_host: 10.0.2.146
+          mac: bc:24:11:e2:9a:f2
+        jellyfin-1:
+          ansible_host: 10.0.1.4
+          mac: bc:24:11:9e:8c:ec
+
