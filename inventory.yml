@@ -5,15 +5,6 @@ all:
         matrix-1:
           ansible_host: 10.0.4.2
           mac: bc:24:11:9a:66:12
-        jellyfin-1:
-          ansible_host: 10.0.1.4
-          mac: bc:24:11:9e:8c:ec
-        vikunja-1:
-          ansible_host: 10.0.4.1
-          mac: bc:24:11:95:a0:b4
-        tidarr-1:
-          ansible_host: 10.0.2.146
-          mac: bc:24:11:e2:9a:f2
         appstack-1:
           ansible_host: 10.0.3.77
           mac: bc:24:11:0e:f4:00
