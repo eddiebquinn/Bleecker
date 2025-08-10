@@ -39,9 +39,6 @@ all:
           mac: ec:f4:bb:c7:0c:c0
     singular-hosts:
       hosts:
-        vikunja-1:
-          ansible_host: 10.0.4.1
-          mac: bc:24:11:95:a0:b4
         tidarr-1:
           ansible_host: 10.0.2.146
           mac: bc:24:11:e2:9a:f2
