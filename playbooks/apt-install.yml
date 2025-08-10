@@ -1,6 +1,6 @@
 ---
 - name: Install packages using apt
-  hosts: all
+  hosts: all:!core_infra
   become: yes
   become_method: sudo
   vars:
