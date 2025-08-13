@@ -26,7 +26,7 @@
 
     - name: Add SSH key to eddie's authorized_keys
       ansible.builtin.copy:
-        content: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC+3hOGkZlS8Y/svftuhz8GliY+A0aePxMhyb42vrZshLQ1DMUBXw695+Sc6AWPdCDbszcyq3hPzH2EPMUUVLbgVzx3NNSZh/zzlugV/SMrQTrhiCB1IqOq7msinqxNhT8D/b+sNwgM2rVhJZqwCFOcImNBufmyh+0ILWsEHu+/1KDhcTVt1KW3WqJJSt+RipSNLfrEdFvpHVZK2ml4voE56bXMfEAAKDHbsW2N/NZDPgXBFeQ6OZZIBnpHEDaiEjxlM/i4OmQB+MnQ8otDRL+7Shw+u/PXYjuiTbKOZ4TjHYOUC6YSrstAFI0H4d8HMZhjA/x5aT9fLPKBcTd31vNphC1D75L+tk9TqbfhfLZsZLHKNWBKp86qJsNKnKGHd5JpA4sQIH4Tj63ZMVryucd+hS7PLMlx3nhUg/nAiBIslZzPyAYUEn2h+evIgIWE0gYFt1lRZPGObp9ntFzxIZqxUqmzn40oqEgogaAmg3aAm5hwigohzlzfRhr8AXZjANs= eddie@two-face\n"
+        content: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBBicLnqL0v89f4d6CQ/Q0gIIlZOnkPj7TPeLeUzu4es eddie@blackhand\n"
         dest: /home/eddie/.ssh/authorized_keys
         owner: eddie
         group: eddie
