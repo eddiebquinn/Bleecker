@@ -65,7 +65,7 @@
     - name: Ensure docker-agent group exists
       ansible.builtin.group:
         name: docker-agent
-        gid: 1001
+        gid: 1101
         state: present
         system: true
       when: "'docker-hosts' in group_names"
@@ -73,7 +73,7 @@
     - name: Ensure docker-agent user exists
       ansible.builtin.user:
         name: docker-agent
-        uid: 1001
+        uid: 1101
         group: docker-agent
         shell: /usr/sbin/nologin
         create_home: no
