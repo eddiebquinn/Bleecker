@@ -16,4 +16,6 @@
         name:
           - vim
           - curl
+          - rsync
+          - tree
         state: present
