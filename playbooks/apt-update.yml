@@ -1,5 +1,5 @@
 ---
-- hosts: all:!core_infra
+- hosts: all:!core_infra:!provisioning
   gather_facts: yes
   become: yes
   become_method: sudo

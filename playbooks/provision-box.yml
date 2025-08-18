@@ -1,6 +1,6 @@
 ---
 - name: Setup semaphore-agent user and secure SSH
-  hosts: all:!core_infra
+  hosts: provisioning
   become: true
   become_method: sudo
   vars:
