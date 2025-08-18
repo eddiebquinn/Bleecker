@@ -20,9 +20,6 @@ all:
         mediastack-1:
           ansible_host: 10.0.3.26
           mac: bc:24:11:31:be:43
-        kasm-1:
-          ansible_host: 10.0.4.56
-          mac: bc:24:11:f8:37:de
     core_infra:
       hosts:
         arasaka-1:
