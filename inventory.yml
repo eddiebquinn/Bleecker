@@ -28,9 +28,5 @@ all:
         datafortress-1:
           ansible_host: 10.0.1.199
           mac: ec:f4:bb:c7:0c:c0
-    singular-hosts:
-      hosts:
-        tidarr-1:
-          ansible_host: 10.0.2.146
-          mac: bc:24:11:e2:9a:f2
+    # singular-hosts:
     # provisioning:
