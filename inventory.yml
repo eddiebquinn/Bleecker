@@ -20,6 +20,8 @@ all:
         mediastack-1:
           ansible_host: 10.0.3.26
           mac: bc:24:11:31:be:43
+        pangolin-1:
+          ansible_host: 89.127.232.7
     core_infra:
       hosts:
         arasaka-1:
@@ -36,7 +38,5 @@ all:
         tdarr-1:
           ansible_host: 10.0.1.67
           mac: bc:24:11:ca:b3:5b
-    provisioning:
-      hosts:
-        pangolin-1:
-          ansible_host: 89.127.232.7
+    #provisioning:
+    #  hosts:
