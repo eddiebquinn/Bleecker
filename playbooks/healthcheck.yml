@@ -24,13 +24,13 @@
         group: eddie
         mode: '0700'
 
-    - name: Add SSH key to eddie's authorized_keys
-      ansible.builtin.copy:
-        content: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBBicLnqL0v89f4d6CQ/Q0gIIlZOnkPj7TPeLeUzu4es eddie@blackhand\n"
-        dest: /home/eddie/.ssh/authorized_keys
-        owner: eddie
-        group: eddie
-        mode: '0600'
+    - name: Add GPG SSH keys to eddie's authorized_keys
+      ansible.posix.authorized_key:
+        user: eddie
+        state: present
+        key: |
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINt1KNkGPH+YPWl6qHX0PhbsevkEw8H1R86nOVV03k8Z
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG
 
     - name: Configure SSH to disable root login and only allow public key authentication
       ansible.builtin.lineinfile:
