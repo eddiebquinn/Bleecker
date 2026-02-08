@@ -1,4 +1,7 @@
 ---
+###############################################################################
+# PLAY 1 — Base system hardening + MOTD + SSH config
+###############################################################################
 - name: Basic health checks
   hosts: all:!core_infra:!provisioning
   become: true
@@ -8,30 +11,9 @@
 
   tasks:
 
-    # - name: Create semaphore-agent user with password
-    #   ansible.builtin.user:
-    #     name: semaphore-agent
-    #     groups: sudo
-    #     state: present
-    #     shell: /bin/bash
-    #     password: "{{ '7r}:y=gijn.CVf5' | password_hash('sha512') }}"
-    # 
-    # - name: Create .ssh directory for semaphore-agent
-    #   ansible.builtin.file:
-    #     path: /home/semaphore-agent/.ssh
-    #     state: directory
-    #     owner: semaphore-agent
-    #     group: semaphore-agent
-    #     mode: '0700'
-    # 
-    # - name: Add SSH key to semaphore-agent's authorized_keys
-    #   ansible.builtin.copy:
-    #     content: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDV4fxm2cfZ7Y2yic4MbIDYnugokmV5mNxh4ndsegFQoPiebm7kRt/iMycGo74TUAGPKJr5cIycIlqPfyV32+By9RfukOugeXOz1GRn5Y1LBV3aaHKW7sczO+eUILTnESCjSp/yMWBXy9eYf2WzM0b9xhhVSY8MN7oBzfpVASJGpmwqd1n8ozr9qkSYqn1cOT4VwvKFp502AtLP2J9hN3GkBU1pGa45diY84QiAo9Ctb64aiSPPYXHPd88bywVYPKaB1z0AQqSqCxF5f8GQso08eUEDm1n+GTyQs2ZEh+1RhQCZKNhIPNDEpg4RrF8nHd1m2jrgu5yxLQ/PnHHBt+24yLJ0wqlbtHLAlWBAK1gd+ervtvirp5BJdpxCG7iidUlfMvgefL5a6X/zjuJ//d1gci6+q49wstwX8PnSbTzQJmibVDRsqW2PU7IMZaCRwvZ/6q8q/B46qBmMF3LoUyCTgW9Hnhp3SIcxV2DO2uj6wCDfi0EsUcs5A/K7HHTEm98= semaphore-agent@samba-1\n"
-    #     dest: /home/semaphore-agent/.ssh/authorized_keys
-    #     owner: semaphore-agent
-    #     group: semaphore-agent
-    #     mode: '0600'
-
+    ###########################################################################
+    # User Setup
+    ###########################################################################
     - name: Create eddie user with password
       ansible.builtin.user:
         name: eddie
@@ -48,7 +30,7 @@
         group: eddie
         mode: '0700'
 
-    - name: Add GPG SSH keys to eddie's authorized_keys
+    - name: Add GPG SSH keys to eddie
       ansible.posix.authorized_key:
         user: eddie
         state: present
@@ -56,7 +38,10 @@
           ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINt1KNkGPH+YPWl6qHX0PhbsevkEw8H1R86nOVV03k8Z
           ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG
 
-    - name: Configure SSH to disable root login and only allow public key authentication
+    ###########################################################################
+    # SSH Hardening
+    ###########################################################################
+    - name: Disable root login and password authentication
       ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: "{{ item.regexp }}"
@@ -66,10 +51,13 @@
       loop:
         - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
         - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^\s*PrintLastLog\s+', line: 'PrintLastLog no' }
       notify: Restart SSH
 
-    # === Disable automatic apt background activity (we patch via Ansible) ===
-    - name: Stop and disable apt-daily timers (Debian/Ubuntu)
+    ###########################################################################
+    # Debian/Ubuntu-specific Tasks
+    ###########################################################################
+    - name: Stop apt-daily timers
       ansible.builtin.systemd:
         name: "{{ item }}"
         enabled: false
@@ -78,9 +66,9 @@
       loop:
         - apt-daily.timer
         - apt-daily-upgrade.timer
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
-    - name: Mask apt-daily services to prevent manual/triggered runs (optional but deterministic)
+    - name: Mask apt-daily services
       ansible.builtin.systemd:
         name: "{{ item }}"
         masked: true
@@ -89,15 +77,18 @@
       loop:
         - apt-daily.service
         - apt-daily-upgrade.service
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
-    - name: Ensure lsb-release is present
+    - name: Ensure lsb-release is installed
       ansible.builtin.apt:
         name: lsb-release
         state: present
         update_cache: yes
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
+    ###########################################################################
+    # Custom MOTD
+    ###########################################################################
     - name: Ensure update-motd directory exists
       ansible.builtin.file:
         path: /etc/update-motd.d
@@ -105,9 +96,9 @@
         owner: root
         group: root
         mode: '0755'
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
-    - name: Deploy custom dynamic MOTD script
+    - name: Deploy custom dynamic MOTD
       ansible.builtin.copy:
         dest: /etc/update-motd.d/50-custom
         owner: root
@@ -115,20 +106,15 @@
         mode: '0755'
         content: |
           #!/bin/bash
-          #
-          # Custom MOTD with host, distro, last login, updates, and service health
-          #
           set -euo pipefail
 
           HOSTNAME=$(hostname)
           DISTRO=$(lsb_release -ds 2>/dev/null || head -n 1 /etc/*release 2>/dev/null)
 
-          # Last login (excluding current session)
           LAST_LINE=$(last -n 5 -w -R | grep -v -E '^(reboot|shutdown|wtmp begins)' | head -n 1 || true)
           LAST_USER=$(echo "$LAST_LINE" | awk '{print $1}')
           LAST_FROM=$(echo "$LAST_LINE" | awk '{print $3}')
 
-          # APT info (only on apt systems)
           if command -v apt >/dev/null 2>&1; then
               PACKAGE_COUNT=$(dpkg -l 2>/dev/null | wc -l)
               PENDING_UPDATES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
@@ -137,7 +123,6 @@
               PENDING_UPDATES="N/A"
           fi
 
-          # systemd failed units
           if command -v systemctl >/dev/null 2>&1; then
               FAILED_SERVICES=$(systemctl --failed --no-legend 2>/dev/null | wc -l)
           else
@@ -156,44 +141,31 @@
           ---------------------------------------------------------------
 
           EOF
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
-    - name: Disable other update-motd snippets (keep 50-custom)
-      ansible.builtin.shell: |
-        set -e
-        for d in /etc/update-motd.d /usr/lib/update-motd.d; do
-          [ -d "$d" ] || continue
-          find "$d" -type f ! -name '50-custom' -exec chmod 0644 {} +
-        done
-      args:
-        executable: /bin/bash
-      when: ansible_facts['os_family'] == 'Debian'
-
-    - name: Comment out PAM static motd line in /etc/pam.d/sshd
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/sshd
-        regexp: '^\s*session\s+optional\s+pam_motd\.so\s+motd=/etc/motd'
-        line: '# \g<0>'
-        backrefs: yes
-      when: ansible_facts['os_family'] == 'Debian'
-
-    - name: Ensure /etc/motd is empty (avoid Debian blurb)
+    - name: Ensure /etc/motd is empty
       ansible.builtin.copy:
         dest: /etc/motd
         content: ""
         owner: root
         group: root
         mode: '0644'
-      when: ansible_facts['os_family'] == 'Debian'
+      when: ansible_facts.os_family == "Debian"
 
-    - name: Disable SSH's own LastLogin line (we print it ourselves)
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^\s*PrintLastLog\s+'
-        line: 'PrintLastLog no'
-        create: no
-      when: ansible_facts['os_family'] == 'Debian'
-      notify: Restart SSH
+    ###########################################################################
+    # Reboot if required (Debian/Ubuntu)
+    ###########################################################################
+    - name: Check if reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Reboot if required
+      ansible.builtin.reboot:
+      when:
+        - ansible_facts.os_family == "Debian"
+        - reboot_required.stat.exists
 
   handlers:
     - name: Restart SSH
@@ -201,11 +173,10 @@
         name: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
         state: restarted
 
-    - name: Reboot if required
-      ansible.builtin.reboot:
-      when: ansible_facts['pkg_mgr'] == 'apt' and ansible_facts['needs_restarting'] == 'reboot-required'
 
-
+###############################################################################
+# PLAY 2 — docker-agent (docker-hosts only)
+###############################################################################
 - name: Ensure docker-agent exists on docker hosts
   hosts: docker-hosts
   become: true
@@ -217,9 +188,8 @@
       ansible.builtin.group:
         name: docker-agent
         gid: 1101
-        state: present
         system: true
-      when: "'docker-hosts' in group_names"
+        state: present
 
     - name: Ensure docker-agent user exists
       ansible.builtin.user:
@@ -230,4 +200,46 @@
         create_home: no
         system: true
         password: "{{ lookup('env', 'DOCKER_AGENT_PASSWORD') | password_hash('sha512') }}"
-      when: "'docker-hosts' in group_names"
+
+
+###############################################################################
+# PLAY 3 — k3s-agent (k3s-hosts only)
+###############################################################################
+- name: Create k3s-agent user and grant passwordless sudo
+  hosts: k3s-hosts
+  become: true
+  become_method: sudo
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+    - name: Create k3s-agent user with password
+      ansible.builtin.user:
+        name: k3s-agent
+        groups: sudo
+        state: present
+        shell: /bin/bash
+        password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
+
+    - name: Create .ssh directory for k3s-agent
+      ansible.builtin.file:
+        path: /home/k3s-agent/.ssh
+        state: directory
+        owner: k3s-agent
+        group: k3s-agent
+        mode: '0700'
+
+    - name: Add SSH key to k3s-agent
+      ansible.posix.authorized_key:
+        user: k3s-agent
+        state: present
+        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPJSTK/xH3KfOJsQQia/noWWB8K/ZvXLWnrUR9tLCvV"
+
+    - name: Grant k3s-agent passwordless sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/k3s-agent
+        content: "k3s-agent ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: 'visudo -cf %s'
