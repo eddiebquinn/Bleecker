@@ -229,11 +229,11 @@
         group: k3s-agent
         mode: '0700'
 
-    - name: Add SSH key to k3s-agent
+    - name: Add Eddie's SSH key to k3s-agent's authorized_keys
       ansible.posix.authorized_key:
         user: k3s-agent
         state: present
-        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPJSTK/xH3KfOJsQQia/noWWB8K/ZvXLWnrUR9tLCvV"
+        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG"
 
     - name: Grant k3s-agent passwordless sudo
       ansible.builtin.copy:
