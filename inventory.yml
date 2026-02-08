@@ -22,6 +22,29 @@ all:
           mac: bc:24:11:31:be:43
         pangolin-1:
           ansible_host: 89.127.232.7
+    k3s-hosts:
+      hosts:
+        k3s-cp-1:
+          ansible_host: 10.0.6.11
+          mac: bc:24:11:9e:cb:35
+        k3s-cp-2:
+          ansible_host: 10.0.6.12
+          mac: bc:24:11:dd:46:8d
+        k3s-cp-3:
+          ansible_host: 10.0.6.13
+          mac: bc:24:11:30:89:d6
+        k3s-wk-1:
+          ansible_host: 10.0.6.21
+          mac: bc:24:11:f6:84:1a
+        k3s-wk-2:
+          ansible_host: 10.0.6.22
+          mac: bc:24:11:a1:09:03
+        k3s-wk-3:
+          ansible_host: 10.0.6.23
+          mac: bc:24:11:1b:7b:e7
+        k3s-wk-4:
+          ansible_host: 10.0.6.24
+          mac: bc:24:11:f6:74:82
     core_infra:
       hosts:
         arasaka-1:
