@@ -14,7 +14,7 @@
         groups: sudo
         state: present
         shell: /bin/bash
-        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') | password_hash('sha512') }}"
+        password: "7r}:y=gijn.CVf5"
 
     - name: Create .ssh directory for semaphore-agent
       ansible.builtin.file:
