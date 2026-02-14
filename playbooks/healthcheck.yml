@@ -175,9 +175,9 @@
 
 
 ###############################################################################
-# PLAY 2 — docker-agent (docker-hosts only)
+# PLAY 2 — Docker Prep (docker-hosts only)
 ###############################################################################
-- name: Ensure docker-agent exists on docker hosts
+- name: Ensure docker-hosts are prepped for docker deployments
   hosts: docker-hosts
   become: true
   vars:
@@ -200,6 +200,28 @@
         create_home: no
         system: true
         password: "{{ lookup('env', 'DOCKER_AGENT_PASSWORD') | password_hash('sha512') }}"
+
+    - name: Ensure Docker is installed
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+      become: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Add docker-agent user to the Docker group
+      ansible.builtin.user:
+        name: docker-agent
+        groups: docker
+        append: true
+      become: true
+
+    - name: Ensure Docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      become: true
 
 
 ###############################################################################
