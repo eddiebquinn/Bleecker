@@ -201,13 +201,13 @@
         system: true
         password: "{{ lookup('env', 'DOCKER_AGENT_PASSWORD') | password_hash('sha512') }}"
 
-    - name: Ensure Docker is installed
-      ansible.builtin.apt:
-        name: docker.io
-        state: present
-        update_cache: yes
-      become: true
-      when: ansible_facts.os_family == "Debian"
+    # - name: Ensure Docker is installed
+    #   ansible.builtin.apt:
+    #     name: docker.io
+    #     state: present
+    #     update_cache: yes
+    #   become: true
+    #   when: ansible_facts.os_family == "Debian"
 
     - name: Add docker-agent user to the Docker group
       ansible.builtin.user:
