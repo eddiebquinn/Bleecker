@@ -1,0 +1,56 @@
+---
+- name: Bootstrap semaphore-agent user and secure SSH
+  hosts: needs_provisioning
+  become: true
+  remote_user: "{{ bootstrap_user }}"
+  gather_facts: true
+
+  tasks:
+    - name: Create semaphore-agent user with password
+      ansible.builtin.user:
+        name: semaphore-agent
+        groups: sudo
+        state: present
+        shell: /bin/bash
+        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') | password_hash('sha512') }}"
+      no_log: true
+
+    - name: Create .ssh directory for semaphore-agent
+      ansible.builtin.file:
+        path: /home/semaphore-agent/.ssh
+        state: directory
+        owner: semaphore-agent
+        group: semaphore-agent
+        mode: '0700'
+
+    - name: Add SSH key to semaphore-agent's authorized_keys
+      ansible.posix.authorized_key:
+        user: semaphore-agent
+        state: present
+        key: "{{ semaphore_agent_authorized_key }}"
+
+    - name: Disable root login and password authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        backrefs: true
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+      notify: Restart SSH
+
+    - name: Mark host as provisioned
+      ansible.builtin.file:
+        path: "{{ provision_marker_path }}"
+        state: touch
+        owner: root
+        group: root
+        mode: "0644"
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
+        state: restarted

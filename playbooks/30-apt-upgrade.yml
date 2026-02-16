@@ -1,0 +1,30 @@
+---
+- name: Upgrade Debian/Ubuntu hosts and reboot if required
+  hosts: all:!core_infra
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Perform dist-upgrade (Debian)
+      ansible.builtin.apt:
+        upgrade: dist
+        update_cache: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Check if a reboot is required (Debian)
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: false
+      register: reboot_required_file
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Reboot the server if required (Debian)
+      ansible.builtin.reboot:
+      when:
+        - ansible_facts.os_family == "Debian"
+        - reboot_required_file.stat.exists
+
+    - name: Remove dependencies no longer required (Debian)
+      ansible.builtin.apt:
+        autoremove: true
+      when: ansible_facts.os_family == "Debian"

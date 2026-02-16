@@ -1,28 +1,33 @@
 ---
-###############################################################################
-# PLAY 1 — Base system hardening + MOTD + SSH config
-###############################################################################
-- name: Basic health checks
-  hosts: all:!core_infra:!provisioning
+- name: Baseline hardening + packages + MOTD + service prep
+  hosts: all:!core_infra
   become: true
-  become_method: sudo
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+  gather_facts: true
 
   tasks:
+    ###########################################################################
+    # Baseline packages (Debian)
+    ###########################################################################
+    - name: Install baseline packages (Debian)
+      ansible.builtin.apt:
+        name: "{{ baseline_apt_packages }}"
+        state: present
+        update_cache: true
+      when: ansible_facts.os_family == "Debian"
 
     ###########################################################################
-    # User Setup
+    # eddie user + keys
     ###########################################################################
-    - name: Create eddie user with password
+    - name: Ensure eddie user exists
       ansible.builtin.user:
         name: eddie
         groups: sudo
         state: present
         shell: /bin/bash
         password: "{{ lookup('env', 'EDDIE_PASSWORD') | password_hash('sha512') }}"
+      no_log: true
 
-    - name: Create .ssh directory for eddie
+    - name: Ensure .ssh directory for eddie
       ansible.builtin.file:
         path: /home/eddie/.ssh
         state: directory
@@ -30,13 +35,12 @@
         group: eddie
         mode: '0700'
 
-    - name: Add GPG SSH keys to eddie
+    - name: Ensure eddie authorized keys are present
       ansible.posix.authorized_key:
         user: eddie
         state: present
-        key: |
-          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINt1KNkGPH+YPWl6qHX0PhbsevkEw8H1R86nOVV03k8Z
-          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG
+        key: "{{ item }}"
+      loop: "{{ eddie_authorized_keys }}"
 
     ###########################################################################
     # SSH Hardening
@@ -47,7 +51,7 @@
         regexp: "{{ item.regexp }}"
         line: "{{ item.line }}"
         state: present
-        backrefs: yes
+        backrefs: true
       loop:
         - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
         - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
@@ -55,9 +59,9 @@
       notify: Restart SSH
 
     ###########################################################################
-    # Debian/Ubuntu-specific Tasks
+    # Debian apt-daily timer suppression
     ###########################################################################
-    - name: Stop apt-daily timers
+    - name: Stop apt-daily timers (Debian)
       ansible.builtin.systemd:
         name: "{{ item }}"
         enabled: false
@@ -68,7 +72,7 @@
         - apt-daily-upgrade.timer
       when: ansible_facts.os_family == "Debian"
 
-    - name: Mask apt-daily services
+    - name: Mask apt-daily services (Debian)
       ansible.builtin.systemd:
         name: "{{ item }}"
         masked: true
@@ -79,17 +83,10 @@
         - apt-daily-upgrade.service
       when: ansible_facts.os_family == "Debian"
 
-    - name: Ensure lsb-release is installed
-      ansible.builtin.apt:
-        name: lsb-release
-        state: present
-        update_cache: yes
-      when: ansible_facts.os_family == "Debian"
-
     ###########################################################################
-    # Custom MOTD
+    # Custom MOTD (Debian)
     ###########################################################################
-    - name: Ensure update-motd directory exists
+    - name: Ensure update-motd directory exists (Debian)
       ansible.builtin.file:
         path: /etc/update-motd.d
         state: directory
@@ -98,7 +95,7 @@
         mode: '0755'
       when: ansible_facts.os_family == "Debian"
 
-    - name: Deploy custom dynamic MOTD
+    - name: Deploy custom dynamic MOTD (Debian)
       ansible.builtin.copy:
         dest: /etc/update-motd.d/50-custom
         owner: root
@@ -143,7 +140,7 @@
           EOF
       when: ansible_facts.os_family == "Debian"
 
-    - name: Ensure /etc/motd is empty
+    - name: Ensure /etc/motd is empty (Debian)
       ansible.builtin.copy:
         dest: /etc/motd
         content: ""
@@ -153,43 +150,15 @@
       when: ansible_facts.os_family == "Debian"
 
     ###########################################################################
-    # Reboot if required (Debian/Ubuntu)
+    # Docker prep (docker-hosts)
     ###########################################################################
-    - name: Check if reboot is required
-      ansible.builtin.stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-      when: ansible_facts.os_family == "Debian"
-
-    - name: Reboot if required
-      ansible.builtin.reboot:
-      when:
-        - ansible_facts.os_family == "Debian"
-        - reboot_required.stat.exists
-
-  handlers:
-    - name: Restart SSH
-      ansible.builtin.service:
-        name: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
-        state: restarted
-
-
-###############################################################################
-# PLAY 2 — Docker Prep (docker-hosts only)
-###############################################################################
-- name: Ensure docker-hosts are prepped for docker deployments
-  hosts: docker-hosts
-  become: true
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
-  tasks:
     - name: Ensure docker-agent group exists
       ansible.builtin.group:
         name: docker-agent
         gid: 1101
         system: true
         state: present
+      when: "'docker-hosts' in group_names"
 
     - name: Ensure docker-agent user exists
       ansible.builtin.user:
@@ -197,65 +166,81 @@
         uid: 1101
         group: docker-agent
         shell: /usr/sbin/nologin
-        create_home: no
+        create_home: false
         system: true
         password: "{{ lookup('env', 'DOCKER_AGENT_PASSWORD') | password_hash('sha512') }}"
+      when: "'docker-hosts' in group_names"
+      no_log: true
 
-    # - name: Ensure Docker is installed
-    #   ansible.builtin.apt:
-    #     name: docker.io
-    #     state: present
-    #     update_cache: yes
-    #   become: true
-    #   when: ansible_facts.os_family == "Debian"
-
-    - name: Add docker-agent user to the Docker group
+    - name: Add docker-agent user to Docker group
       ansible.builtin.user:
         name: docker-agent
         groups: docker
         append: true
-      become: true
+      when: "'docker-hosts' in group_names"
 
     - name: Ensure Docker service is running
       ansible.builtin.service:
         name: docker
         state: started
         enabled: true
-      become: true
+      when: "'docker-hosts' in group_names"
 
+    - name: Ensure docker-agent ssh directory exists
+      ansible.builtin.file:
+        path: "/var/lib/docker-agent/.ssh"
+        state: directory
+        owner: docker-agent
+        group: docker-agent
+        mode: "0700"
+      when: "'docker-hosts' in group_names"
 
-###############################################################################
-# PLAY 3 — k3s-agent (k3s-hosts only)
-###############################################################################
-- name: Create k3s-agent user and grant passwordless sudo
-  hosts: k3s-hosts
-  become: true
-  become_method: sudo
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+    - name: Install docker-agent private key
+      ansible.builtin.copy:
+        content: "{{ lookup('env', 'DOCKER_AGENT_PRIVATE_KEY') }}"
+        dest: "/var/lib/docker-agent/.ssh/id_rsa"
+        owner: docker-agent
+        group: docker-agent
+        mode: "0600"
+      when: "'docker-hosts' in group_names"
+      no_log: true
 
-  tasks:
-    - name: Create k3s-agent user with password
+    - name: Ensure docker-agent known_hosts contains gitlab-ssh host key
+      ansible.builtin.known_hosts:
+        path: "/var/lib/docker-agent/.ssh/known_hosts"
+        name: "gitlab-ssh.eddiequinn.casa"
+        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa gitlab-ssh.eddiequinn.casa 2>/dev/null') }}"
+        state: present
+      when: "'docker-hosts' in group_names"
+
+    ###########################################################################
+    # k3s agent user (k3s-hosts)
+    ###########################################################################
+    - name: Ensure k3s-agent user exists
       ansible.builtin.user:
         name: k3s-agent
         groups: sudo
         state: present
         shell: /bin/bash
         password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
+      when: "'k3s-hosts' in group_names"
+      no_log: true
 
-    - name: Create .ssh directory for k3s-agent
+    - name: Ensure .ssh directory for k3s-agent
       ansible.builtin.file:
         path: /home/k3s-agent/.ssh
         state: directory
         owner: k3s-agent
         group: k3s-agent
         mode: '0700'
+      when: "'k3s-hosts' in group_names"
 
     - name: Add Eddie's SSH key to k3s-agent's authorized_keys
       ansible.posix.authorized_key:
         user: k3s-agent
         state: present
-        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG"
+        key: "{{ eddie_authorized_keys[1] }}"
+      when: "'k3s-hosts' in group_names"
 
     - name: Grant k3s-agent passwordless sudo
       ansible.builtin.copy:
@@ -265,3 +250,10 @@
         group: root
         mode: '0440'
         validate: 'visudo -cf %s'
+      when: "'k3s-hosts' in group_names"
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
+        state: restarted
