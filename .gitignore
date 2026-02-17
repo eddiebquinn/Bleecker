@@ -1,0 +1,6 @@
+# --- direnv / Nix ---
+.direnv/
+result
+
+# --- Ansible ---
+.ansible/
