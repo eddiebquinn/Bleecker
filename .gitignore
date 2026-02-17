@@ -5,3 +5,4 @@ result
 
 # --- Ansible ---
 .ansible/
+*-extra.yml
