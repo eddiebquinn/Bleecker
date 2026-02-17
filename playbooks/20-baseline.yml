@@ -205,11 +205,21 @@
       when: "'docker_hosts' in group_names"
       no_log: true
 
-    - name: Ensure docker-agent known_hosts contains gitlab-ssh host key
+    - name: Fetch gitlab-ssh host keys (controller-side)
+      ansible.builtin.command: ssh-keyscan -p 2424 -t ed25519,rsa gitlab-ssh.eddiequinn.casa
+      delegate_to: localhost
+      run_once: true
+      become: false
+      register: gitlab_sshkeyscan
+      changed_when: false
+      failed_when: gitlab_sshkeyscan.rc != 0 or gitlab_sshkeyscan.stdout | length == 0
+      when: "'docker_hosts' in group_names"
+
+    - name: Add gitlab-ssh host keys to docker-agent known_hosts
       ansible.builtin.known_hosts:
         path: "/var/lib/docker-agent/.ssh/known_hosts"
-        name: "gitlab-ssh.eddiequinn.casa"
-        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa gitlab-ssh.eddiequinn.casa 2>/dev/null') }}"
+        name: "[gitlab-ssh.eddiequinn.casa]:2424"
+        key: "{{ gitlab_sshkeyscan.stdout }}"
         state: present
       when: "'docker_hosts' in group_names"
 
@@ -233,7 +243,7 @@
         owner: k3s-agent
         group: k3s-agent
         mode: '0700'
-      when: "'k3s-hosts' in group_names"
+      when: "'k3s_hosts' in group_names"
 
     - name: Add Eddie's SSH key to k3s-agent's authorized_keys
       ansible.posix.authorized_key:
