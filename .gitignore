@@ -1,5 +1,6 @@
 # --- direnv / Nix ---
 .direnv/
+.secrets/
 result
 
 # --- Ansible ---
