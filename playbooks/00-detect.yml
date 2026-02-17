@@ -1,6 +1,6 @@
 ---
 - name: Detect provision state and group hosts dynamically
-  hosts: all
+  hosts: managed
   gather_facts: false
 
   tasks:
