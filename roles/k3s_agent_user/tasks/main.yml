@@ -1,0 +1,38 @@
+---
+- name: Ensure k3s-agent user exists (locked password)
+  ansible.builtin.user:
+    name: "{{ k3s_agent_username }}"
+    shell: "{{ k3s_agent_shell }}"
+    password_lock: true
+    state: present
+  when: k3s_agent_user_enabled | bool
+
+- name: Ensure .ssh directory for k3s-agent
+  ansible.builtin.file:
+    path: "/home/{{ k3s_agent_username }}/.ssh"
+    state: directory
+    owner: "{{ k3s_agent_username }}"
+    group: "{{ k3s_agent_username }}"
+    mode: "0700"
+  when:
+    - k3s_agent_user_enabled | bool
+    - k3s_agent_authorized_keys | length > 0
+
+- name: Add authorized keys to k3s-agent
+  ansible.posix.authorized_key:
+    user: "{{ k3s_agent_username }}"
+    state: present
+    key: "{{ item }}"
+  loop: "{{ k3s_agent_authorized_keys }}"
+  when:
+    - k3s_agent_user_enabled | bool
+    - k3s_agent_authorized_keys | length > 0
+  no_log: true
+
+- name: Remove k3s-agent passwordless sudo (drop-in)
+  ansible.builtin.file:
+    path: "{{ k3s_agent_sudoers_dropin }}"
+    state: absent
+  when:
+    - k3s_agent_user_enabled | bool
+    - k3s_agent_remove_passwordless_sudo | bool

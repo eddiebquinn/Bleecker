@@ -1,0 +1,11 @@
+k3s_agent_user_enabled: true
+
+k3s_agent_username: k3s-agent
+k3s_agent_shell: /bin/bash
+
+k3s_agent_authorized_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINt1KNkGPH+YPWl6qHX0PhbsevkEw8H1R86nOVV03k8Z"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG"
+
+k3s_agent_sudoers_dropin: /etc/sudoers.d/k3s-agent
+k3s_agent_remove_passwordless_sudo: true

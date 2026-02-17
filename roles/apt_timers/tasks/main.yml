@@ -1,0 +1,26 @@
+---
+- name: Stop apt-daily timers (Debian)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  when:
+    - apt_timers_enabled | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Mask apt-daily services (Debian)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    masked: true
+    enabled: false
+    state: stopped
+  loop:
+    - apt-daily.service
+    - apt-daily-upgrade.service
+  when:
+    - apt_timers_enabled | bool
+    - ansible_facts.os_family == "Debian"

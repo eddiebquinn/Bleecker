@@ -1,0 +1,6 @@
+users_manage_eddie: false
+eddie_username: eddie
+eddie_groups: []
+eddie_shell: /bin/bash
+eddie_authorized_keys: []
+baseline_apt_packages: []

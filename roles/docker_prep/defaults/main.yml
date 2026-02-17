@@ -1,0 +1,12 @@
+docker_prep_enabled: false
+
+docker_agent_name: docker-agent
+docker_agent_uid: 1101
+docker_agent_gid: 1101
+docker_agent_home: /var/lib/docker-agent
+docker_agent_shell: /usr/sbin/nologin
+
+docker_agent_authorized_keys: []
+docker_agent_known_hosts: []
+
+docker_service_name: docker

@@ -1,0 +1,37 @@
+---
+- name: Install baseline packages (Debian)
+  ansible.builtin.apt:
+    name: "{{ baseline_apt_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - baseline_apt_packages | length > 0
+
+- name: Ensure eddie user exists
+  ansible.builtin.user:
+    name: "{{ eddie_username }}"
+    groups: "{{ eddie_groups }}"
+    append: true
+    shell: "{{ eddie_shell }}"
+    state: present
+  when: users_manage_eddie | bool
+
+- name: Ensure .ssh directory for eddie
+  ansible.builtin.file:
+    path: "/home/{{ eddie_username }}/.ssh"
+    state: directory
+    owner: "{{ eddie_username }}"
+    group: "{{ eddie_username }}"
+    mode: "0700"
+  when: users_manage_eddie | bool
+
+- name: Ensure eddie authorized keys are present
+  ansible.posix.authorized_key:
+    user: "{{ eddie_username }}"
+    state: present
+    key: "{{ item }}"
+  loop: "{{ eddie_authorized_keys }}"
+  when:
+    - users_manage_eddie | bool
+    - eddie_authorized_keys | length > 0

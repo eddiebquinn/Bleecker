@@ -1,0 +1,3 @@
+motd_dynamic_enabled: true
+motd_custom_script_path: /etc/update-motd.d/50-custom
+motd_empty_static_motd: true
