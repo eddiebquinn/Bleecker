@@ -9,6 +9,7 @@
       ansible.builtin.include_role:
         name: komodo_deploy
         tasks_from: sync
+      tags: [sync]
 
 - name: Deploy Komodo Core
   hosts: docker_hosts
@@ -21,6 +22,7 @@
         name: komodo_deploy
         tasks_from: core
       when: (komodo_core | default(false)) | bool
+      tags: [core]
 
 - name: Deploy Komodo Periphery
   hosts: docker_hosts
@@ -32,3 +34,4 @@
       ansible.builtin.include_role:
         name: komodo_deploy
         tasks_from: periphery
+      tags: [periphery]
