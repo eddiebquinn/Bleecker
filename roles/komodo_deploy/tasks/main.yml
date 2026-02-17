@@ -1,0 +1,11 @@
+---
+- name: Sync repo
+  ansible.builtin.include_tasks: sync.yml
+
+- name: Deploy core
+  ansible.builtin.include_tasks: core.yml
+  when: (komodo_run_core | default(false)) | bool
+
+- name: Deploy periphery
+  ansible.builtin.include_tasks: periphery.yml
+  when: (komodo_run_periphery | default(false)) | bool

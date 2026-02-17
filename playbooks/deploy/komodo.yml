@@ -1,0 +1,44 @@
+---
+- name: Sync Komodo repo to docker hosts
+  hosts: docker_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Sync repo
+      ansible.builtin.include_role:
+        name: komodo_deploy
+        tasks_from: sync
+        apply:
+          tags: [sync, core, periphery]
+      tags: [sync, core, periphery]
+
+- name: Deploy Komodo Core
+  hosts: docker_hosts
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Run Komodo core deployment
+      ansible.builtin.include_role:
+        name: komodo_deploy
+        tasks_from: core
+        apply:
+          tags:
+            - core
+      when: (komodo_core | default(false)) | bool
+      tags: [core]
+
+- name: Deploy Komodo Periphery
+  hosts: docker_hosts
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Run Komodo periphery deployment
+      ansible.builtin.include_role:
+        name: komodo_deploy
+        tasks_from: periphery
+        apply:
+          tags:
+            - periphery
+      tags: [periphery]

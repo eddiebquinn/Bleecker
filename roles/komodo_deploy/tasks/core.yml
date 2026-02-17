@@ -1,0 +1,11 @@
+---
+- name: Run Komodo core deploy
+  ansible.builtin.command:
+    argv:
+      - sh
+      - "{{ komodo_deploy_script }}"
+      - --core
+  args:
+    chdir: "{{ komodo_repo_dest }}"
+  when: (komodo_core | default(false)) | bool
+  changed_when: true
