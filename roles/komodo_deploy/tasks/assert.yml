@@ -1,0 +1,26 @@
+---
+- name: Assert required Komodo variables are set
+  ansible.builtin.assert:
+    that:
+      - komodo_repo_url is defined
+      - komodo_repo_url | length > 0
+      - komodo_repo_dest is defined
+      - komodo_repo_dest | length > 0
+    fail_msg: "Komodo vars missing. Set komodo_repo_url and komodo_repo_dest in inventory/group_vars/docker_hosts.yml."
+  changed_when: false
+
+- name: Assert deploy key provided for Komodo repo clone
+  ansible.builtin.assert:
+    that:
+      - komodo_repo_deploy_key_private is defined
+      - komodo_repo_deploy_key_private | length > 0
+    fail_msg: "komodo_repo_deploy_key_private not provided. Pass it via CI (-e) or inventory."
+  changed_when: false
+
+- name: Assert pinned known_hosts provided for Komodo git server
+  ansible.builtin.assert:
+    that:
+      - komodo_git_known_hosts is defined
+      - komodo_git_known_hosts | length > 0
+    fail_msg: "komodo_git_known_hosts not provided. Pass pinned ssh-keyscan output via CI (-e)."
+  changed_when: false

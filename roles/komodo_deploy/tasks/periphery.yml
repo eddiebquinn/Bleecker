@@ -1,0 +1,5 @@
+---
+- name: Run Komodo periphery deploy
+  ansible.builtin.command: "sh {{ komodo_deploy_script }} --periphery"
+  args:
+    chdir: "{{ komodo_repo_dest }}"
