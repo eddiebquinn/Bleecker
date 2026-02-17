@@ -3,16 +3,14 @@
   hosts: docker_hosts
   become: true
   gather_facts: true
-
   tasks:
     - name: Sync repo
       ansible.builtin.include_role:
         name: komodo_deploy
         tasks_from: sync
         apply:
-          tags:
-            - sync
-      tags: [sync]
+          tags: [sync, core, periphery]
+      tags: [sync, core, periphery]
 
 - name: Deploy Komodo Core
   hosts: docker_hosts
