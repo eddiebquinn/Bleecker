@@ -1,0 +1,70 @@
+---
+- name: Ensure update-motd directory exists (Debian)
+  ansible.builtin.file:
+    path: /etc/update-motd.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - motd_dynamic_enabled | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Deploy custom dynamic MOTD (Debian)
+  ansible.builtin.copy:
+    dest: "{{ motd_custom_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      HOSTNAME=$(hostname)
+      DISTRO=$(lsb_release -ds 2>/dev/null || head -n 1 /etc/*release 2>/dev/null)
+
+      LAST_LINE=$(last -n 5 -w -R | grep -v -E '^(reboot|shutdown|wtmp begins)' | head -n 1 || true)
+      LAST_USER=$(echo "$LAST_LINE" | awk '{print $1}')
+      LAST_FROM=$(echo "$LAST_LINE" | awk '{print $3}')
+
+      if command -v apt >/dev/null 2>&1; then
+          PACKAGE_COUNT=$(dpkg -l 2>/dev/null | wc -l)
+          PENDING_UPDATES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
+      else
+          PACKAGE_COUNT="N/A"
+          PENDING_UPDATES="N/A"
+      fi
+
+      if command -v systemctl >/dev/null 2>&1; then
+          FAILED_SERVICES=$(systemctl --failed --no-legend 2>/dev/null | wc -l)
+      else
+          FAILED_SERVICES="N/A"
+      fi
+
+      cat <<EOF
+
+      ---------------------------------------------------------------
+      Host: ${HOSTNAME}
+      Distro: ${DISTRO}
+      Last Login: ${LAST_USER:-N/A} from ${LAST_FROM:-N/A}
+
+      APT Health: ${PENDING_UPDATES} / ${PACKAGE_COUNT}
+      Service Health: ${FAILED_SERVICES} failed
+      ---------------------------------------------------------------
+
+      EOF
+  when:
+    - motd_dynamic_enabled | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Ensure /etc/motd is empty (Debian)
+  ansible.builtin.copy:
+    dest: /etc/motd
+    content: ""
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - motd_dynamic_enabled | bool
+    - motd_empty_static_motd | bool
+    - ansible_facts.os_family == "Debian"

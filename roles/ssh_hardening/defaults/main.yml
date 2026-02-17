@@ -1,0 +1,5 @@
+ssh_hardening_enabled: true
+sshd_config_path: /etc/ssh/sshd_config
+ssh_disable_root_login: true
+ssh_disable_password_auth: true
+ssh_print_last_log: false
