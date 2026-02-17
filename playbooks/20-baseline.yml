@@ -226,15 +226,12 @@
     ###########################################################################
     # k3s agent user (k3s-hosts)
     ###########################################################################
-    - name: Ensure k3s-agent user exists
+
+    - name: Lock k3s-agent password (no password login possible)
       ansible.builtin.user:
         name: k3s-agent
-        groups: sudo
-        state: present
-        shell: /bin/bash
-        password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
+        password_lock: true
       when: "'k3s_hosts' in group_names"
-      no_log: true
 
     - name: Ensure .ssh directory for k3s-agent
       ansible.builtin.file:
@@ -252,15 +249,23 @@
         key: "{{ eddie_authorized_keys[1] }}"
       when: "'k3s_hosts' in group_names"
 
-    - name: Grant k3s-agent passwordless sudo
-      ansible.builtin.copy:
-        dest: /etc/sudoers.d/k3s-agent
-        content: "k3s-agent ALL=(ALL) NOPASSWD: ALL\n"
-        owner: root
-        group: root
-        mode: '0440'
-        validate: 'visudo -cf %s'
+    - name: Remove k3s-agent passwordless sudo
+      ansible.builtin.file:
+        path: /etc/sudoers.d/k3s-agent
+        state: absent
       when: "'k3s_hosts' in group_names"
+
+    # Incase i need k3sup in future
+    # - name: TEMP: Enable k3s-agent passwordless sudo (bootstrap only)
+    #   ansible.builtin.copy:
+    #     dest: /etc/sudoers.d/k3s-agent
+    #     content: "k3s-agent ALL=(ALL) NOPASSWD: ALL\n"
+    #     owner: root
+    #     group: root
+    #     mode: '0440'
+    #     validate: 'visudo -cf %s'
+    #   when: "'k3s_hosts' in group_names"
+    #   tags: [k3s_bootstrap]
 
   handlers:
     - name: Restart SSH
