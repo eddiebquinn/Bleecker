@@ -160,17 +160,18 @@
         state: present
       when: "'docker_hosts' in group_names"
 
-    - name: Ensure docker-agent user exists
+    - name: Ensure docker-agent user exists (no password, no interactive login)
       ansible.builtin.user:
         name: docker-agent
         uid: 1101
         group: docker-agent
         shell: /usr/sbin/nologin
-        create_home: false
+        create_home: true
+        home: /var/lib/docker-agent
         system: true
-        password: "{{ lookup('env', 'DOCKER_AGENT_PASSWORD') | password_hash('sha512') }}"
+        password_lock: true
+        state: present
       when: "'docker_hosts' in group_names"
-      no_log: true
 
     - name: Add docker-agent user to Docker group
       ansible.builtin.user:
@@ -186,42 +187,13 @@
         enabled: true
       when: "'docker_hosts' in group_names"
 
-    - name: Ensure docker-agent ssh directory exists
+    # Clean up any old SSH footprint from earlier iterations
+    - name: Remove docker-agent SSH directory (not required)
       ansible.builtin.file:
         path: "/var/lib/docker-agent/.ssh"
-        state: directory
-        owner: docker-agent
-        group: docker-agent
-        mode: "0700"
+        state: absent
       when: "'docker_hosts' in group_names"
 
-    - name: Install docker-agent private key
-      ansible.builtin.copy:
-        content: "{{ lookup('env', 'DOCKER_AGENT_PRIVATE_KEY') }}"
-        dest: "/var/lib/docker-agent/.ssh/id_rsa"
-        owner: docker-agent
-        group: docker-agent
-        mode: "0600"
-      when: "'docker_hosts' in group_names"
-      no_log: true
-
-    - name: Fetch gitlab-ssh host keys (controller-side)
-      ansible.builtin.command: ssh-keyscan -p 2424 -t ed25519,rsa gitlab-ssh.eddiequinn.casa
-      delegate_to: localhost
-      run_once: true
-      become: false
-      register: gitlab_sshkeyscan
-      changed_when: false
-      failed_when: gitlab_sshkeyscan.rc != 0 or gitlab_sshkeyscan.stdout | length == 0
-      when: "'docker_hosts' in group_names"
-
-    - name: Add gitlab-ssh host keys to docker-agent known_hosts
-      ansible.builtin.known_hosts:
-        path: "/var/lib/docker-agent/.ssh/known_hosts"
-        name: "[gitlab-ssh.eddiequinn.casa]:2424"
-        key: "{{ gitlab_sshkeyscan.stdout }}"
-        state: present
-      when: "'docker_hosts' in group_names"
 
     ###########################################################################
     # k3s agent user (k3s-hosts)
