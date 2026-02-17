@@ -1,0 +1,17 @@
+---
+- name: Apply SSH hardening settings
+  ansible.builtin.lineinfile:
+    path: "{{ sshd_config_path }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+    validate: "/usr/sbin/sshd -t -f %s"
+  loop:
+    - regexp: '^#?\s*PermitRootLogin\s+'
+      line: "{{ 'PermitRootLogin no' if ssh_disable_root_login else 'PermitRootLogin yes' }}"
+    - regexp: '^#?\s*PasswordAuthentication\s+'
+      line: "{{ 'PasswordAuthentication no' if ssh_disable_password_auth else 'PasswordAuthentication yes' }}"
+    - regexp: '^#?\s*PrintLastLog\s+'
+      line: "{{ 'PrintLastLog no' if (ssh_print_last_log | bool) == false else 'PrintLastLog yes' }}"
+  notify: Restart SSH
+  when: ssh_hardening_enabled | bool

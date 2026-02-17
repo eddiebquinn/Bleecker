@@ -1,0 +1,72 @@
+---
+- name: Bootstrap semaphore-agent user and secure SSH
+  hosts: needs_provisioning
+  become: true
+  remote_user: "{{ bootstrap_user }}"
+  gather_facts: true
+
+  tasks:
+    - name: Create semaphore-agent user (locked password)
+      ansible.builtin.user:
+        name: semaphore-agent
+        groups: sudo
+        shell: /bin/bash
+        password_lock: true
+        state: present
+
+    - name: Create .ssh directory for semaphore-agent
+      ansible.builtin.file:
+        path: /home/semaphore-agent/.ssh
+        state: directory
+        owner: semaphore-agent
+        group: semaphore-agent
+        mode: '0700'
+
+    - name: Add SSH key to semaphore-agent's authorized_keys
+      ansible.posix.authorized_key:
+        user: semaphore-agent
+        state: present
+        key: "{{ semaphore_agent_authorized_key }}"
+
+    - name: Allow semaphore-agent passwordless sudo (scoped)
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/semaphore-agent
+        owner: root
+        group: root
+        mode: "0440"
+        content: |
+          Defaults:semaphore-agent !authenticate
+
+          Cmnd_Alias SEMAPHORE_CMDS = \
+            /usr/bin/apt, /usr/bin/apt-get, /usr/bin/dpkg, \
+            /usr/bin/systemctl, /bin/systemctl, \
+            /usr/bin/tee, /bin/mkdir, /bin/chmod, /bin/chown, \
+            /usr/sbin/usermod, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/adduser
+
+          semaphore-agent ALL=(root) NOPASSWD: SEMAPHORE_CMDS
+
+    - name: Validate sudoers
+      ansible.builtin.command: visudo -cf /etc/sudoers.d/semaphore-agent
+      changed_when: false
+
+    - name: Ensure provision marker directory exists
+      ansible.builtin.file:
+        path: "{{ provision_marker_path | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Mark host as provisioned
+      ansible.builtin.file:
+        path: "{{ provision_marker_path }}"
+        state: touch
+        owner: root
+        group: root
+        mode: "0644"
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
+        state: restarted

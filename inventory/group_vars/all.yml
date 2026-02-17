@@ -1,0 +1,33 @@
+ansible_python_interpreter: /usr/bin/python3
+
+# Baseline packages (Debian/Ubuntu)
+baseline_apt_packages:
+  - vim
+  - curl
+  - rsync
+  - tree
+  - lsb-release
+
+# Users role config
+users_manage_eddie: true
+eddie_username: eddie
+eddie_groups: ["sudo"]
+eddie_shell: /bin/bash
+eddie_authorized_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINt1KNkGPH+YPWl6qHX0PhbsevkEw8H1R86nOVV03k8Z"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+zfnhEIwiI2u03QnRjghuAYFQRbdzqT1pXHWD69eaG"
+
+# SSH hardening config
+ssh_hardening_enabled: true
+sshd_config_path: /etc/ssh/sshd_config
+ssh_disable_root_login: true
+ssh_disable_password_auth: true
+ssh_print_last_log: false
+
+# MOTD config
+motd_dynamic_enabled: true
+motd_custom_script_path: /etc/update-motd.d/50-custom
+motd_empty_static_motd: true
+
+# marker path
+provision_marker_path: /etc/markers/provisioned

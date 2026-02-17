@@ -1,0 +1,6 @@
+k3s_agent_user_enabled: false
+k3s_agent_username: k3s-agent
+k3s_agent_shell: /bin/bash
+k3s_agent_authorized_keys: []
+k3s_agent_sudoers_dropin: /etc/sudoers.d/k3s-agent
+k3s_agent_remove_passwordless_sudo: true

@@ -1,0 +1,16 @@
+---
+- name: Detect provision state and group hosts dynamically
+  hosts: managed
+  gather_facts: false
+
+  tasks:
+    - name: Check provision marker
+      ansible.builtin.stat:
+        path: "{{ provision_marker_path }}"
+      register: prov_marker
+      failed_when: false
+
+    - name: Group hosts that need provisioning
+      ansible.builtin.group_by:
+        key: needs_provisioning
+      when: not prov_marker.stat.exists
