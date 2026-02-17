@@ -1,0 +1,93 @@
+---
+- name: Assert required Komodo variables are set
+  ansible.builtin.assert:
+    that:
+      - komodo_repo_url is defined
+      - komodo_repo_url | length > 0
+      - komodo_repo_dest is defined
+      - komodo_repo_dest | length > 0
+    fail_msg: "Komodo vars missing. Set komodo_repo_url and komodo_repo_dest in inventory/group_vars/docker_hosts.yml."
+  changed_when: false
+
+- name: Assert deploy key provided for Komodo repo clone
+  ansible.builtin.assert:
+    that:
+      - komodo_repo_deploy_key_private is defined
+      - komodo_repo_deploy_key_private | length > 0
+    fail_msg: "komodo_repo_deploy_key_private not provided. Pass it via CI (-e) or inventory."
+  changed_when: false
+
+- name: Assert pinned known_hosts provided for Komodo git server
+  ansible.builtin.assert:
+    that:
+      - komodo_git_known_hosts is defined
+      - komodo_git_known_hosts | length > 0
+    fail_msg: "komodo_git_known_hosts not provided. Pass pinned ssh-keyscan output via CI (-e)."
+  changed_when: false
+
+- name: Install git (Debian)
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure Komodo repo base directory exists
+  ansible.builtin.file:
+    path: "{{ komodo_repo_dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure Komodo SSH directory exists
+  ansible.builtin.file:
+    path: "{{ komodo_repo_ssh_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write Komodo repo deploy key (from CI)
+  ansible.builtin.copy:
+    dest: "{{ komodo_repo_ssh_key_path }}"
+    content: "{{ komodo_repo_deploy_key_private }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Write pinned known_hosts for Komodo git server
+  ansible.builtin.copy:
+    dest: "{{ komodo_repo_known_hosts_path }}"
+    content: "{{ komodo_git_known_hosts }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Clone/update Komodo repo (using pinned host key + deploy key)
+  ansible.builtin.git:
+    repo: "{{ komodo_repo_url }}"
+    dest: "{{ komodo_repo_dest }}"
+    version: "{{ komodo_repo_branch }}"
+    update: true
+    force: true
+    key_file: "{{ komodo_repo_ssh_key_path }}"
+    accept_hostkey: false
+  environment:
+    GIT_SSH_COMMAND: >-
+      ssh
+      -o UserKnownHostsFile={{ komodo_repo_known_hosts_path }}
+      -o StrictHostKeyChecking=yes
+
+- name: Run Komodo core deploy
+  ansible.builtin.command: "sh {{ komodo_deploy_script }} --core"
+  args:
+    chdir: "{{ komodo_repo_dest }}"
+  when: (komodo_run_core | default(false)) | bool
+
+- name: Run Komodo periphery deploy
+  ansible.builtin.command: "sh {{ komodo_deploy_script }} --periphery"
+  args:
+    chdir: "{{ komodo_repo_dest }}"
+  when: (komodo_run_periphery | default(false)) | bool

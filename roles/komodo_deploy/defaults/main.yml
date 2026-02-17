@@ -1,0 +1,18 @@
+# Repo settings (set in inventory/group_vars/docker_hosts.yml)
+komodo_repo_url: ""
+komodo_repo_dest: "/etc/komodo/repos/komodo"
+komodo_repo_branch: "master"
+komodo_deploy_script: "./deploy"
+
+# SSH material location on the *remote host* (not secrets themselves)
+komodo_repo_ssh_dir: "/etc/komodo/ssh"
+komodo_repo_ssh_key_path: "/etc/komodo/ssh/id_ed25519"
+komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
+
+# These are injected at runtime (CI) — DO NOT commit real values
+komodo_repo_deploy_key_private: ""
+komodo_git_known_hosts: ""
+
+# Role behaviour toggles (playbook sets these per phase)
+komodo_run_core: false
+komodo_run_periphery: true
