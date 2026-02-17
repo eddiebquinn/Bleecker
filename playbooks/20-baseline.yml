@@ -1,6 +1,6 @@
 ---
 - name: Baseline hardening + packages + MOTD + service prep
-  hosts: all:!core_infra
+  hosts: managed
   become: true
   gather_facts: true
 
@@ -22,10 +22,9 @@
       ansible.builtin.user:
         name: eddie
         groups: sudo
-        state: present
+        append: true
         shell: /bin/bash
-        password: "{{ lookup('env', 'EDDIE_PASSWORD') | password_hash('sha512') }}"
-      no_log: true
+        state: present
 
     - name: Ensure .ssh directory for eddie
       ansible.builtin.file:
@@ -52,6 +51,7 @@
         line: "{{ item.line }}"
         state: present
         backrefs: true
+        validate: "sshd -t -f %s"
       loop:
         - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
         - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }

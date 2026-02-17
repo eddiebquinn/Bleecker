@@ -49,18 +49,6 @@
       ansible.builtin.command: visudo -cf /etc/sudoers.d/semaphore-agent
       changed_when: false
 
-    - name: Disable root login and password authentication
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        state: present
-        backrefs: true
-      loop:
-        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
-        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
-      notify: Restart SSH
-
     - name: Ensure provision marker directory exists
       ansible.builtin.file:
         path: "{{ provision_marker_path | dirname }}"
