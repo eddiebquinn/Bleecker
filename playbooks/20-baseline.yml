@@ -158,7 +158,7 @@
         gid: 1101
         system: true
         state: present
-      when: "'docker-hosts' in group_names"
+      when: "'docker_hosts' in group_names"
 
     - name: Ensure docker-agent user exists
       ansible.builtin.user:
@@ -223,7 +223,7 @@
         state: present
         shell: /bin/bash
         password: "{{ lookup('env', 'K3S_AGENT_PASSWORD') | password_hash('sha512') }}"
-      when: "'k3s-hosts' in group_names"
+      when: "'k3s_hosts' in group_names"
       no_log: true
 
     - name: Ensure .ssh directory for k3s-agent
