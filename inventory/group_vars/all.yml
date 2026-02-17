@@ -1,8 +1,5 @@
 ansible_python_interpreter: /usr/bin/python3
 
-# Normal operations user (exists after provisioning)
-ansible_user: semaphore-agent
-
 # Bootstrap user for fresh hosts (must already exist on new boxes)
 bootstrap_user: eddie
 

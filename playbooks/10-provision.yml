@@ -6,14 +6,13 @@
   gather_facts: true
 
   tasks:
-    - name: Create semaphore-agent user with password
+    - name: Create semaphore-agent user (locked password)
       ansible.builtin.user:
         name: semaphore-agent
         groups: sudo
-        state: present
         shell: /bin/bash
-        password: "{{ lookup('env', 'SEMAPHORE_AGENT_PASSWORD') | password_hash('sha512') }}"
-      no_log: true
+        password_lock: true
+        state: present
 
     - name: Create .ssh directory for semaphore-agent
       ansible.builtin.file:
@@ -29,6 +28,27 @@
         state: present
         key: "{{ semaphore_agent_authorized_key }}"
 
+    - name: Allow semaphore-agent passwordless sudo (scoped)
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/semaphore-agent
+        owner: root
+        group: root
+        mode: "0440"
+        content: |
+          Defaults:semaphore-agent !authenticate
+
+          Cmnd_Alias SEMAPHORE_CMDS = \
+            /usr/bin/apt, /usr/bin/apt-get, /usr/bin/dpkg, \
+            /usr/bin/systemctl, /bin/systemctl, \
+            /usr/bin/tee, /bin/mkdir, /bin/chmod, /bin/chown, \
+            /usr/sbin/usermod, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/adduser
+
+          semaphore-agent ALL=(root) NOPASSWD: SEMAPHORE_CMDS
+
+    - name: Validate sudoers
+      ansible.builtin.command: visudo -cf /etc/sudoers.d/semaphore-agent
+      changed_when: false
+
     - name: Disable root login and password authentication
       ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
@@ -40,6 +60,14 @@
         - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
         - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
       notify: Restart SSH
+
+    - name: Ensure provision marker directory exists
+      ansible.builtin.file:
+        path: "{{ provision_marker_path | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
 
     - name: Mark host as provisioned
       ansible.builtin.file:
