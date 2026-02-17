@@ -12,7 +12,7 @@ docker_service_name: docker
 komodo_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/komodo.git"
 komodo_repo_dest: "/etc/komodo/repos/komodo"
 komodo_repo_branch: "master"
-komodo_deploy_script: "./deploy"
+komodo_deploy_script: "./deploy.sh"
 
 komodo_repo_ssh_dir: "/etc/komodo/ssh"
 komodo_repo_ssh_key_path: "/etc/komodo/ssh/id_ed25519"
