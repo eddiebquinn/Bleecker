@@ -1,0 +1,32 @@
+stages:
+  - validate
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
+
+cache:
+  paths:
+    - .cache/pip
+
+ansible-validate:
+  stage: validate
+  image: python:3.12-slim
+  when: manual
+  allow_failure: false
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install ansible
+  script:
+    - ansible-playbook -i inventory/hosts.yml site.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml --syntax-check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: manual
