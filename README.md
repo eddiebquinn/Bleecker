@@ -9,9 +9,10 @@ This repository manages baseline configuration, provisioning, and lifecycle auto
 ## Overview
 The design goal is reproducibility, idempotency, and clean separation of concerns:
 * Static inventory defines *what hosts exist*
-* Dynamic grouping defines *what lifecycle state they are in*
 * Roles define *how configuration is applied*
 * Playbooks orchestrate lifecycle phases
+* New-host bootstrap is explicit
+* Recurring lifecycle runs stay boring and reliable
 * No manual inventory mutation
 * No secrets stored in Git
 
@@ -84,7 +85,7 @@ Host groups are used to scope configuration cleanly without conditionals scatter
 
 ## Provisioning Model
 
-Provisioning is dynamic.
+Provisioning is explicit.
 
 A host is considered **provisioned** when the marker file exists:
 
@@ -92,20 +93,25 @@ A host is considered **provisioned** when the marker file exists:
 /etc/markers/provisioned
 ```
 
-Lifecycle flow:
+Recommended flow:
 
-### 1. `00-detect.yml`
+### 1. `10-provision.yml`
 
-* Checks for provision marker
-* Dynamically groups hosts without it into `needs_provisioning`
+Run this explicitly for **new hosts only**.
 
-### 2. `10-provision.yml`
-
-* Bootstraps `semaphore-agent` using a `bootstrap_user`
-* Establishes initial SSH access
+It:
+* Connects using a provided `bootstrap_user`
+* Creates the `semaphore-agent` automation user
+* Installs the supplied `semaphore_agent_authorized_key`
 * Creates the provision marker file
 
-### 3. `20-baseline.yml`
+Required bootstrap vars:
+* `bootstrap_user`
+* `semaphore_agent_authorized_key`
+
+These should be passed at runtime or supplied via a non-committed vars file.
+
+### 2. `20-baseline.yml`
 
 Applies recurring baseline configuration using modular roles:
 * `users` — system users and SSH keys
@@ -115,7 +121,15 @@ Applies recurring baseline configuration using modular roles:
 * `docker_prep` — docker-agent setup for docker hosts
 * `k3s_agent_user` — k3s-agent configuration for k3s hosts
 
-This separation keeps lifecycle orchestration thin and pushes logic into reusable, testable roles.
+### 3. `site.yml`
+
+`site.yml` is intentionally limited to recurring baseline runs so normal lifecycle convergence does not depend on first-contact bootstrap logic.
+
+### Note on `00-detect.yml`
+
+`00-detect.yml` remains in the repository as an experimental detection helper, but it is not part of the default recurring lifecycle path.
+
+This separation keeps recurring runs reliable and makes new-host onboarding more predictable.
 
 ## Role-Based Design
 Baseline configuration is implemented as composable Ansible roles under:
@@ -134,24 +148,27 @@ Each role:
 This structure enables CI-driven deployments and selective automation without monolithic playbooks.
 
 ## Running
-**Full lifecycle run**
+**Recurring lifecycle run**
 ```bash
 ansible-playbook -i inventory/hosts.yml site.yml
 ```
 
-**Provision a specific new host**
+**Bootstrap a specific new host**
 ```bash
-ansible-playbook -i inventory/hosts.yml site.yml --limit newhost-1
+ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml \
+  --limit newhost-1 \
+  -e bootstrap_user=root \
+  -e "semaphore_agent_authorized_key=$(cat ~/.ssh/id_ed25519.pub)"
 ```
 
 **Apply baseline only**
 ```bash
-ansible-playbook -i inventory/hosts.yml playbooks/20-baseline.yml
+ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml
 ```
 
-**Perform System Upgrade**
+**Perform system upgrade**
 ```bash
-ansible-playbook -i inventory/hosts.yml playbooks/30-apt-upgrade.yml
+ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml
 ```
 
 ## CI Integration Model
