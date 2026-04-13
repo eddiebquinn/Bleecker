@@ -1,9 +1,22 @@
 ---
 - name: Bootstrap semaphore-agent user and secure SSH
-  hosts: needs_provisioning
+  hosts: all
   become: true
   remote_user: "{{ bootstrap_user }}"
   gather_facts: true
+
+  pre_tasks:
+    - name: Assert required bootstrap variables are provided
+      ansible.builtin.assert:
+        that:
+          - bootstrap_user is defined
+          - bootstrap_user | length > 0
+          - semaphore_agent_authorized_key is defined
+          - semaphore_agent_authorized_key | length > 0
+        fail_msg: >-
+          bootstrap_user and semaphore_agent_authorized_key must be provided for bootstrap runs.
+          Example: ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml
+          --limit newhost-1 -e bootstrap_user=root
 
   tasks:
     - name: Create semaphore-agent user (locked password)

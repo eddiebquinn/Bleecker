@@ -31,3 +31,8 @@ motd_empty_static_motd: true
 
 # marker path
 provision_marker_path: /etc/markers/provisioned
+
+# bootstrap variables are intentionally left empty here and should be supplied
+# at runtime or via a separate non-committed vars file for new-host onboarding.
+bootstrap_user: ""
+semaphore_agent_authorized_key: ""

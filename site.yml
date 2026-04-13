@@ -1,4 +1,2 @@
 ---
-- import_playbook: playbooks/lifecycle/00-detect.yml
-- import_playbook: playbooks/lifecycle/10-provision.yml
 - import_playbook: playbooks/lifecycle/20-baseline.yml
