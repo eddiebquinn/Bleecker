@@ -222,6 +222,35 @@ TARGET_HOSTS=k3s_hosts
 TARGET_HOSTS=managed
 ```
 
+### Docker discovery runs
+
+A manual CI job is available for discovery work against Docker hosts without changing them.
+
+Job:
+
+```text
+ansible-discover-docker-state
+```
+
+Default scope:
+
+```bash
+DISCOVERY_TARGETS=docker_hosts
+```
+
+The job connects to the target hosts over SSH and collects Docker-related state into a pipeline artifact, including:
+
+* Docker Engine version
+* Docker client/server API versions
+* Compose plugin version
+* installed Docker-related packages
+* apt package policy output
+* Docker-related apt sources
+* Docker service enabled/active state
+* whether `docker info` succeeds
+
+This is intended for inventory and migration planning before standardising Docker across the estate.
+
 ### Concurrency note
 
 `ansible.cfg` uses:

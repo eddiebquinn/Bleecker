@@ -1,4 +1,5 @@
 docker_prep_enabled: false
+docker_manage_packages: false
 
 docker_agent_name: docker-agent
 docker_agent_uid: 1101
@@ -10,3 +11,23 @@ docker_agent_authorized_keys: []
 docker_agent_known_hosts: []
 
 docker_service_name: docker
+docker_apt_keyring_dir: /etc/apt/keyrings
+docker_apt_keyring_path: /etc/apt/keyrings/docker.asc
+docker_apt_repo_filename: docker.sources
+docker_apt_repo_baseurl_debian: https://download.docker.com/linux/debian
+docker_apt_repo_baseurl_ubuntu: https://download.docker.com/linux/ubuntu
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_conflicting_packages_common:
+  - docker.io
+  - docker-compose
+  - docker-doc
+  - podman-docker
+  - containerd
+  - runc
+docker_conflicting_packages_ubuntu:
+  - docker-compose-v2
