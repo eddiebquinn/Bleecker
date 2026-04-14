@@ -17,6 +17,25 @@
     group: root
     mode: "0755"
 
+- name: Ensure Komodo repo directory exists with consistent ownership
+  ansible.builtin.file:
+    path: "{{ komodo_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mark Komodo repo path as a safe Git directory for root
+  ansible.builtin.command:
+    argv:
+      - git
+      - config
+      - --global
+      - --add
+      - safe.directory
+      - "{{ komodo_repo_dest }}"
+  changed_when: false
+
 - name: Ensure Komodo SSH directory exists
   ansible.builtin.file:
     path: "{{ komodo_repo_ssh_dir }}"
