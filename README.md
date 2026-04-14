@@ -118,7 +118,7 @@ Applies recurring baseline configuration using modular roles:
 * `ssh_hardening` — hardened SSH configuration
 * `apt_timers` — disable/mask unattended timers
 * `motd_dynamic` — dynamic system MOTD
-* `docker_prep` — docker-agent setup for docker hosts
+* `docker_prep` — docker-agent setup for docker hosts, with Docker package standardisation scaffolding available behind a safe toggle
 * `k3s_agent_user` — k3s-agent configuration for k3s hosts
 
 ### 3. `site.yml`
@@ -165,6 +165,34 @@ ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml \
 ```bash
 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml
 ```
+
+### Docker standardisation note
+
+For `docker_hosts`, the `docker_prep` role now contains scaffolding for Docker package cleanup and installation using Docker's official apt repository.
+
+Current safety posture:
+
+* `docker_manage_packages` defaults to `false`
+* package standardisation is therefore **not** active by default in normal lifecycle runs yet
+* this is intentional so discovery, canary rollout, and cleanup logic can be validated before broad rollout
+
+The intended target package set is:
+
+* `docker-ce`
+* `docker-ce-cli`
+* `containerd.io`
+* `docker-buildx-plugin`
+* `docker-compose-plugin`
+
+The intended conflicting package cleanup set includes:
+
+* `docker.io`
+* `docker-compose`
+* `docker-compose-v2`
+* `docker-doc`
+* `podman-docker`
+* `containerd`
+* `runc`
 
 **Perform system upgrade**
 ```bash
