@@ -1,0 +1,41 @@
+---
+- name: Discover Docker state across target hosts
+  hosts: "{{ discovery_targets | default('docker_hosts') }}"
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Collect Docker state snapshot
+      ansible.builtin.shell: |
+        set -o pipefail
+        echo "=== HOSTNAME ==="
+        hostname -f 2>/dev/null || hostname
+        echo "=== OS ==="
+        . /etc/os-release && printf 'NAME=%s VERSION=%s\n' "$NAME" "$VERSION"
+        echo "=== DOCKER_VERSION ==="
+        docker --version 2>&1 || true
+        echo "=== DOCKER_API ==="
+        docker version --format 'client={% raw %}{{.Client.APIVersion}}{% endraw %} server={% raw %}{{.Server.APIVersion}}{% endraw %}' 2>&1 || true
+        echo "=== DOCKER_COMPOSE ==="
+        docker compose version 2>&1 || true
+        echo "=== DOCKER_PACKAGES ==="
+        dpkg-query -W -f='${Package} ${Version}\n' docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io docker-compose containerd runc 2>/dev/null || true
+        echo "=== APT_POLICY ==="
+        apt-cache policy docker-ce docker-ce-cli containerd.io docker-compose-plugin docker.io docker-compose containerd runc 2>/dev/null || true
+        echo "=== DOCKER_APT_SOURCES ==="
+        grep -R 'download.docker.com\|docker' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
+        echo "=== DOCKER_SERVICE ==="
+        systemctl is-enabled docker 2>&1 || true
+        systemctl is-active docker 2>&1 || true
+        echo "=== DOCKER_SOCKET ==="
+        docker info >/dev/null 2>&1 && echo ok || echo failed
+      args:
+        executable: /bin/bash
+      register: docker_state
+      changed_when: false
+
+    - name: Print Docker state snapshot
+      ansible.builtin.debug:
+        msg: |
+          ===== {{ inventory_hostname }} =====
+          {{ docker_state.stdout | default('') }}
