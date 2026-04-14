@@ -173,7 +173,7 @@ ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml
 
 ## CI Validation and Dry-Run Workflow
 
-This repository now uses two CI checks to make lifecycle changes safer before merge.
+This repository uses CI checks to make lifecycle changes safer before merge.
 
 ### `ansible-validate`
 
@@ -199,7 +199,7 @@ This means the dry-run is treated as a real CI gate for the recurring lifecycle 
 
 ### Required CI/CD Variables
 
-The dry-run job requires these project-level CI/CD variables:
+The SSH-backed jobs require these project-level CI/CD variables:
 
 * `ANSIBLE_USER`
   * SSH username used by the CI runner to connect to managed hosts
@@ -232,6 +232,32 @@ forks = 5
 
 This lower parallelism was chosen after CI dry-run testing showed it to be more reliable across the full managed estate, especially the k3s hosts.
 
+## Automated Updates
+
+Updates are handled by the `ansible-apply-updates` CI job.
+
+### Behaviour
+
+* runs `playbooks/lifecycle/30-apt-upgrade.yml`
+* waits only for `ansible-validate`, so update runs are not blocked by the lifecycle dry-run stage
+* targets `managed` by default via:
+
+```bash
+UPDATE_TARGETS=managed
+```
+
+* uses the same SSH CI variables and host key bootstrap flow as the lifecycle dry-run
+* runs apt in non-interactive mode to avoid CI hangs caused by package prompts or `needrestart`
+* can reboot hosts when the playbook determines a reboot is required
+* performs `autoremove` after upgrades
+
+### Triggering model
+
+* **automatic on scheduled pipelines**
+* **manual from the GitLab web UI** for ad hoc runs started with **Run pipeline**
+
+This keeps routine patching automated while still allowing on-demand update execution when needed.
+
 ## CI Integration Model
 
 The repository is designed to support CI-driven infrastructure convergence.
@@ -240,11 +266,13 @@ Typical flow:
 1. Change raised in a merge request
 2. CI runs syntax validation automatically
 3. CI runs a non-mutating dry-run of `site.yml` automatically
-4. Once reviewed and merged, the same repository remains suitable for later live convergence workflows
+4. Scheduled pipelines can run the update playbook automatically
+5. Manual web-triggered runs remain available for targeted operator actions
 
 This enables:
 * safer Git-triggered infrastructure changes
 * deterministic validation before merge
+* automated patching for the managed estate
 * less reliance on ad hoc manual SSH orchestration
 
 ## Secrets Handling

@@ -1,11 +1,13 @@
 stages:
   - validate
   - dry-run
+  - update
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
   TARGET_HOSTS: "managed"
+  UPDATE_TARGETS: "managed"
 
 cache:
   paths:
@@ -19,6 +21,22 @@ cache:
     - apt-get install -y openssh-client
     - python -m pip install --upgrade pip
     - pip install ansible
+
+.default_ssh_ansible_job: &default_ssh_ansible_job
+  <<: *default_ansible_job
+  before_script:
+    - apt-get update
+    - apt-get install -y openssh-client
+    - python -m pip install --upgrade pip
+    - pip install ansible
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
+    - chmod 600 ~/.ssh/ci_ansible_key
+
+.rules_validate_dryrun: &rules_validate_dryrun
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
@@ -28,8 +46,17 @@ cache:
       when: manual
     - when: never
 
+.rules_update: &rules_update
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
+
 ansible-validate:
   <<: *default_ansible_job
+  <<: *rules_validate_dryrun
   stage: validate
   script:
     - ansible-playbook -i inventory/hosts.yml site.yml --syntax-check
@@ -39,7 +66,8 @@ ansible-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml --syntax-check
 
 ansible-dry-run-lifecycle:
-  <<: *default_ansible_job
+  <<: *default_ssh_ansible_job
+  <<: *rules_validate_dryrun
   stage: dry-run
   before_script:
     - apt-get update
@@ -59,13 +87,10 @@ ansible-dry-run-lifecycle:
       python3 - <<'PY' > /tmp/ansible_hosts.txt
       import yaml
       from pathlib import Path
-
       data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
       targets = {line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()}
       hosts = []
-
       all_hosts = data.get('all', {})
-
       def walk_children(node):
           if not isinstance(node, dict):
               return
@@ -80,9 +105,7 @@ ansible-dry-run-lifecycle:
           if isinstance(children, dict):
               for child in children.values():
                   walk_children(child)
-
       walk_children(all_hosts)
-
       for host in hosts:
           print(host)
       PY
@@ -91,3 +114,55 @@ ansible-dry-run-lifecycle:
     - chmod 644 .ansible/known_hosts
   script:
     - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$TARGET_HOSTS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+
+ansible-apply-updates:
+  <<: *default_ssh_ansible_job
+  <<: *rules_update
+  stage: update
+  needs:
+    - job: ansible-validate
+  before_script:
+    - apt-get update
+    - apt-get install -y openssh-client
+    - python -m pip install --upgrade pip
+    - pip install ansible
+    - test -n "$UPDATE_TARGETS" || (echo "UPDATE_TARGETS is required" && exit 1)
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
+    - chmod 600 ~/.ssh/ci_ansible_key
+    - ansible -i inventory/hosts.yml "$UPDATE_TARGETS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
+    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched UPDATE_TARGETS=$UPDATE_TARGETS" && exit 1)
+    - |
+      python3 - <<'PY' > /tmp/ansible_hosts.txt
+      import yaml
+      from pathlib import Path
+      data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
+      targets = {line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()}
+      hosts = []
+      all_hosts = data.get('all', {})
+      def walk_children(node):
+          if not isinstance(node, dict):
+              return
+          host_map = node.get('hosts', {})
+          if isinstance(host_map, dict):
+              for name, attrs in host_map.items():
+                  if name in targets and isinstance(attrs, dict):
+                      host = attrs.get('ansible_host', name)
+                      if host not in hosts:
+                          hosts.append(host)
+          children = node.get('children', {})
+          if isinstance(children, dict):
+              for child in children.values():
+                  walk_children(child)
+      walk_children(all_hosts)
+      for host in hosts:
+          print(host)
+      PY
+    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for UPDATE_TARGETS=$UPDATE_TARGETS" && exit 1)
+    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - chmod 644 .ansible/known_hosts
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
