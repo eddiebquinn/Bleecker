@@ -171,20 +171,81 @@ ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml
 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml
 ```
 
+## CI Validation and Dry-Run Workflow
+
+This repository now uses two CI checks to make lifecycle changes safer before merge.
+
+### `ansible-validate`
+
+Runs syntax checks against the main playbooks on:
+* merge requests
+* commits to the default branch
+
+This catches YAML, playbook, and role wiring errors without contacting any remote hosts.
+
+### `ansible-dry-run-lifecycle`
+
+Runs `site.yml` in Ansible check mode with diff enabled on:
+* merge requests
+* commits to the default branch
+
+Default scope:
+
+```bash
+TARGET_HOSTS=managed
+```
+
+This means the dry-run is treated as a real CI gate for the recurring lifecycle path while remaining non-mutating.
+
+### Required CI/CD Variables
+
+The dry-run job requires these project-level CI/CD variables:
+
+* `ANSIBLE_USER`
+  * SSH username used by the CI runner to connect to managed hosts
+* `SSH_PRIVATE_KEY`
+  * Private key matching a public key already trusted on the managed hosts
+
+The pipeline builds `.ansible/known_hosts` dynamically via `ssh-keyscan` for the targeted hosts before running Ansible.
+
+### Manual ad hoc runs
+
+The pipeline can still be run manually from the GitLab UI.
+
+Useful examples:
+
+```bash
+TARGET_HOSTS=arrstack-1
+TARGET_HOSTS=arrstack-1:mediastack-1
+TARGET_HOSTS=docker_hosts
+TARGET_HOSTS=k3s_hosts
+TARGET_HOSTS=managed
+```
+
+### Concurrency note
+
+`ansible.cfg` uses:
+
+```ini
+forks = 5
+```
+
+This lower parallelism was chosen after CI dry-run testing showed it to be more reliable across the full managed estate, especially the k3s hosts.
+
 ## CI Integration Model
 
 The repository is designed to support CI-driven infrastructure convergence.
 
 Typical flow:
-1. Change pushed to `master`
-2. CI runner clones this repository
-3. CI executes targeted playbooks (e.g. `40-komodo.yml`)
-4. Hosts converge automatically
+1. Change raised in a merge request
+2. CI runs syntax validation automatically
+3. CI runs a non-mutating dry-run of `site.yml` automatically
+4. Once reviewed and merged, the same repository remains suitable for later live convergence workflows
 
 This enables:
-* Git-triggered container deployments
-* Deterministic infra changes
-* No manual SSH orchestration
+* safer Git-triggered infrastructure changes
+* deterministic validation before merge
+* less reliance on ad hoc manual SSH orchestration
 
 ## Secrets Handling
 Secrets are not stored in this repository.
