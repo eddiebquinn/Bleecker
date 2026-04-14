@@ -29,11 +29,15 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │       ├── docker_hosts.yml
 │       └── k3s_hosts.yml
 ├── playbooks/
-│   ├── 00-detect.yml
-│   ├── 10-provision.yml
-│   ├── 20-baseline.yml
-│   ├── 30-apt-upgrade.yml
-│   └── 40-komodo.yml (optional deployment playbook)
+│   ├── lifecycle/
+│   │   ├── 00-detect.yml
+│   │   ├── 10-provision.yml
+│   │   ├── 20-baseline.yml
+│   │   └── 30-apt-upgrade.yml
+│   ├── deploy/
+│   │   └── komodo.yml
+│   └── discovery/
+│       └── docker-state.yml
 ├── roles/
 │   ├── users/
 │   ├── ssh_hardening/
@@ -41,6 +45,7 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   ├── motd_dynamic/
 │   ├── docker_prep/
 │   ├── k3s_agent_user/
+│   ├── komodo_deploy/
 │   └── ...
 ├── flake.nix
 ├── flake.lock
