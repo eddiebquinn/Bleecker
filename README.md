@@ -199,6 +199,8 @@ The intended conflicting package cleanup set includes:
 * `containerd`
 * `runc`
 
+Conflicting packages are removed without `apt purge` so distro package post-removal scripts do not try to wipe live Docker state under `/var/lib/docker` during canary migration.
+
 **Perform system upgrade**
 ```bash
 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml
@@ -230,6 +232,22 @@ TARGET_HOSTS=managed
 
 This means the dry-run is treated as a real CI gate for the recurring lifecycle path while remaining non-mutating.
 
+### `ansible-apply-lifecycle`
+
+Runs the full lifecycle playbook without check mode as a manual job.
+
+Triggering model:
+* manual on merge request pipelines after `ansible-validate` and `ansible-dry-run-lifecycle`
+* manual on web-triggered pipelines
+
+Default scope:
+
+```bash
+LIFECYCLE_TARGETS=managed
+```
+
+This is intended for deliberate operator-triggered convergence once the non-mutating checks have already passed.
+
 ### Required CI/CD Variables
 
 The SSH-backed jobs require these project-level CI/CD variables:
@@ -254,35 +272,6 @@ TARGET_HOSTS=docker_hosts
 TARGET_HOSTS=k3s_hosts
 TARGET_HOSTS=managed
 ```
-
-### Docker discovery runs
-
-A manual CI job is available for discovery work against Docker hosts without changing them.
-
-Job:
-
-```text
-ansible-discover-docker-state
-```
-
-Default scope:
-
-```bash
-DISCOVERY_TARGETS=docker_hosts
-```
-
-The job connects to the target hosts over SSH and collects Docker-related state into a pipeline artifact, including:
-
-* Docker Engine version
-* Docker client/server API versions
-* Compose plugin version
-* installed Docker-related packages
-* apt package policy output
-* Docker-related apt sources
-* Docker service enabled/active state
-* whether `docker info` succeeds
-
-This is intended for inventory and migration planning before standardising Docker across the estate.
 
 ### Concurrency note
 
