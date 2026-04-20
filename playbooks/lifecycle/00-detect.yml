@@ -1,7 +1,15 @@
 ---
-- name: Detect provision state and group hosts dynamically
-  hosts: managed
+- name: Detect provision state and write host lists
+  hosts: "{{ detect_targets | default('managed') }}"
   gather_facts: false
+  ignore_unreachable: true
+  vars:
+    detect_targets_expanded: "{{ query('inventory_hostnames', detect_targets | default('managed')) }}"
+    detect_output_dir: >-
+      {{
+        detect_output_dir
+        | default((lookup('env', 'CI_PROJECT_DIR') | default(playbook_dir | dirname, true)) ~ '/detect', true)
+      }}
 
   tasks:
     - name: Check provision marker
@@ -9,8 +17,89 @@
         path: "{{ provision_marker_path }}"
       register: prov_marker
       failed_when: false
+      changed_when: false
 
-    - name: Group hosts that need provisioning
-      ansible.builtin.group_by:
-        key: needs_provisioning
-      when: not prov_marker.stat.exists
+    - name: Record provision state
+      ansible.builtin.set_fact:
+        provision_marker_exists: "{{ prov_marker.stat.exists | default(false) | bool }}"
+
+    - name: Build detection host lists
+      ansible.builtin.set_fact:
+        provisioned_host_list: >-
+          {% set ns = namespace(hosts=[]) %}
+          {% for host in detect_targets_expanded %}
+          {% if hostvars[host].provision_marker_exists is defined and hostvars[host].provision_marker_exists %}
+          {% set _ = ns.hosts.append(host) %}
+          {% endif %}
+          {% endfor %}
+          {{ ns.hosts | to_json }}
+        unprovisioned_host_list: >-
+          {% set ns = namespace(hosts=[]) %}
+          {% for host in detect_targets_expanded %}
+          {% if hostvars[host].provision_marker_exists is not defined or not hostvars[host].provision_marker_exists %}
+          {% set _ = ns.hosts.append(host) %}
+          {% endif %}
+          {% endfor %}
+          {{ ns.hosts | to_json }}
+        unreachable_host_list: >-
+          {% set ns = namespace(hosts=[]) %}
+          {% for host in detect_targets_expanded %}
+          {% if hostvars[host].provision_marker_exists is not defined %}
+          {% set _ = ns.hosts.append(host) %}
+          {% endif %}
+          {% endfor %}
+          {{ ns.hosts | to_json }}
+      run_once: true
+      delegate_to: localhost
+
+    - name: Ensure detection output directory exists
+      ansible.builtin.file:
+        path: "{{ detect_output_dir }}"
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Write provisioned host list
+      ansible.builtin.copy:
+        dest: "{{ detect_output_dir }}/provisioned_hosts.txt"
+        mode: "0644"
+        content: "{{ ((provisioned_host_list | from_json) | join('\n')) ~ '\n' }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Write unprovisioned host list
+      ansible.builtin.copy:
+        dest: "{{ detect_output_dir }}/unprovisioned_hosts.txt"
+        mode: "0644"
+        content: "{{ ((unprovisioned_host_list | from_json) | join('\n')) ~ '\n' }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Write unreachable host list
+      ansible.builtin.copy:
+        dest: "{{ detect_output_dir }}/unreachable_hosts.txt"
+        mode: "0644"
+        content: "{{ ((unreachable_host_list | from_json) | join('\n')) ~ '\n' }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Show detection summary
+      ansible.builtin.debug:
+        msg:
+          - "Provisioned hosts: {{ lookup('ansible.builtin.file', detect_output_dir + '/provisioned_hosts.txt').splitlines() | reject('equalto', '') | list }}"
+          - "Unprovisioned hosts: {{ lookup('ansible.builtin.file', detect_output_dir + '/unprovisioned_hosts.txt').splitlines() | reject('equalto', '') | list }}"
+          - "Unreachable hosts: {{ lookup('ansible.builtin.file', detect_output_dir + '/unreachable_hosts.txt').splitlines() | reject('equalto', '') | list }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Warn if any detection targets were unreachable
+      ansible.builtin.debug:
+        msg: >-
+          Provision state detection could not reach: {{ lookup('ansible.builtin.file', detect_output_dir + '/unreachable_hosts.txt').splitlines() | reject('equalto', '') | join(', ') }}.
+          These hosts are being treated as unprovisioned for bootstrap workflows.
+      when: >-
+        (lookup('ansible.builtin.file', detect_output_dir + '/unreachable_hosts.txt').splitlines()
+        | reject('equalto', '') | list | length) > 0
+      run_once: true
+      delegate_to: localhost

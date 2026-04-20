@@ -18,5 +18,5 @@ komodo_repo_ssh_dir: "/etc/komodo/ssh"
 komodo_repo_ssh_key_path: "/etc/komodo/ssh/id_ed25519"
 komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
 
-# Docker package management stays disabled until canary rollout begins
-docker_manage_packages: false
+# Docker package management is enabled so fresh Docker hosts can bootstrap cleanly
+docker_manage_packages: true

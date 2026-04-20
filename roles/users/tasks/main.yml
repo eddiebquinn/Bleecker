@@ -17,6 +17,14 @@
     state: present
   when: users_manage_eddie | bool
 
+- name: Check whether eddie user already exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ eddie_username }}"
+  register: eddie_user_getent
+  failed_when: false
+  when: users_manage_eddie | bool
+
 - name: Ensure .ssh directory for eddie
   ansible.builtin.file:
     path: "/home/{{ eddie_username }}/.ssh"
@@ -24,7 +32,9 @@
     owner: "{{ eddie_username }}"
     group: "{{ eddie_username }}"
     mode: "0700"
-  when: users_manage_eddie | bool
+  when:
+    - users_manage_eddie | bool
+    - not ansible_check_mode or (eddie_user_getent.ansible_facts.getent_passwd | default({})).get(eddie_username) is not none
 
 - name: Ensure eddie authorized keys are present
   ansible.posix.authorized_key:
@@ -35,3 +45,4 @@
   when:
     - users_manage_eddie | bool
     - eddie_authorized_keys | length > 0
+    - not ansible_check_mode or (eddie_user_getent.ansible_facts.getent_passwd | default({})).get(eddie_username) is not none
