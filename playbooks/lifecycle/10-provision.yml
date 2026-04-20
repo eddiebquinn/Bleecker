@@ -3,6 +3,9 @@
   hosts: all
   become: true
   remote_user: "{{ bootstrap_user }}"
+  vars:
+    ansible_user: "{{ bootstrap_user }}"
+    ansible_ssh_user: "{{ bootstrap_user }}"
   gather_facts: true
 
   pre_tasks:
@@ -10,13 +13,17 @@
       ansible.builtin.assert:
         that:
           - bootstrap_user is defined
-          - bootstrap_user | length > 0
+          - bootstrap_user | trim | length > 0
           - semaphore_agent_authorized_key is defined
-          - semaphore_agent_authorized_key | length > 0
+          - semaphore_agent_authorized_key | trim | length > 0
         fail_msg: >-
           bootstrap_user and semaphore_agent_authorized_key must be provided for bootstrap runs.
           Example: ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml
           --limit newhost-1 -e bootstrap_user=root
+
+    - name: Normalise semaphore-agent authorized key
+      ansible.builtin.set_fact:
+        semaphore_agent_authorized_key_normalized: "{{ semaphore_agent_authorized_key | trim }}"
 
   tasks:
     - name: Create semaphore-agent user (locked password)
@@ -35,11 +42,13 @@
         group: semaphore-agent
         mode: '0700'
 
-    - name: Add SSH key to semaphore-agent's authorized_keys
-      ansible.posix.authorized_key:
-        user: semaphore-agent
-        state: present
-        key: "{{ semaphore_agent_authorized_key }}"
+    - name: Write semaphore-agent authorized_keys directly
+      ansible.builtin.copy:
+        dest: /home/semaphore-agent/.ssh/authorized_keys
+        owner: semaphore-agent
+        group: semaphore-agent
+        mode: '0600'
+        content: "{{ semaphore_agent_authorized_key_normalized }}\n"
 
     - name: Allow semaphore-agent passwordless sudo (scoped)
       ansible.builtin.copy:

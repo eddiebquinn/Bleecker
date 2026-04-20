@@ -1,15 +1,15 @@
 stages:
   - validate
-  - dry-run
-  - discover
-  - update
+  - apply
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
   TARGET_HOSTS: "managed"
+  DETECT_TARGETS: "managed"
   LIFECYCLE_TARGETS: "managed"
   UPDATE_TARGETS: "managed"
+  PROVISION_MARKER_PATH: "/etc/markers/provisioned"
 
 cache:
   paths:
@@ -33,30 +33,42 @@ cache:
     - pip install ansible
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
-    - mkdir -p ~/.ssh .ansible
+    - mkdir -p ~/.ssh .ansible detect
     - chmod 700 ~/.ssh
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
     - chmod 600 ~/.ssh/ci_ansible_key
 
-.rules_validate_dryrun: &rules_validate_dryrun
+.rules_validate: &rules_validate
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: manual
+      when: never
+    - when: never
+
+.rules_detect: &rules_detect
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
     - when: never
 
 .rules_update: &rules_update
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
 
-.rules_manual_lifecycle_apply: &rules_manual_lifecycle_apply
+.rules_manual_apply: &rules_manual_apply
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
@@ -66,33 +78,42 @@ cache:
 
 ansible-validate:
   <<: *default_ansible_job
-  <<: *rules_validate_dryrun
+  <<: *rules_validate
   stage: validate
   script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/00-detect.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml site.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml --syntax-check
 
-ansible-dry-run-lifecycle:
+ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
-  <<: *rules_validate_dryrun
-  stage: dry-run
+  <<: *rules_detect
+  stage: validate
+  needs:
+    - job: ansible-validate
+  artifacts:
+    when: always
+    paths:
+      - detect/provisioned_hosts.txt
+      - detect/unprovisioned_hosts.txt
+      - detect/unreachable_hosts.txt
   before_script:
     - apt-get update
     - apt-get install -y openssh-client
     - python -m pip install --upgrade pip
     - pip install ansible
-    - test -n "$TARGET_HOSTS" || (echo "TARGET_HOSTS is required" && exit 1)
+    - test -n "$DETECT_TARGETS" || (echo "DETECT_TARGETS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
-    - mkdir -p ~/.ssh .ansible
+    - mkdir -p ~/.ssh .ansible detect
     - chmod 700 ~/.ssh
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
     - chmod 600 ~/.ssh/ci_ansible_key
-    - ansible -i inventory/hosts.yml "$TARGET_HOSTS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
-    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
+    - ansible -i inventory/hosts.yml "$DETECT_TARGETS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
+    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched DETECT_TARGETS=$DETECT_TARGETS" && exit 1)
     - |
       python3 - <<'PY' > /tmp/ansible_hosts.txt
       import yaml
@@ -119,16 +140,180 @@ ansible-dry-run-lifecycle:
       for host in hosts:
           print(host)
       PY
-    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
+    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for DETECT_TARGETS=$DETECT_TARGETS" && exit 1)
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
   script:
-    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$TARGET_HOSTS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/00-detect.yml --limit "$DETECT_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e "detect_targets=$DETECT_TARGETS" -e "detect_output_dir=$CI_PROJECT_DIR/detect"
+
+ansible-dry-run-lifecycle:
+  <<: *default_ssh_ansible_job
+  <<: *rules_validate
+  stage: validate
+  needs:
+    - job: ansible-detect-provision-state
+      artifacts: true
+  before_script:
+    - apt-get update
+    - apt-get install -y openssh-client
+    - python -m pip install --upgrade pip
+    - pip install ansible
+    - test -n "$TARGET_HOSTS" || (echo "TARGET_HOSTS is required" && exit 1)
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
+    - test -f detect/provisioned_hosts.txt || (echo "Detection artifact detect/provisioned_hosts.txt is missing" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
+    - chmod 600 ~/.ssh/ci_ansible_key
+    - ansible -i inventory/hosts.yml "$TARGET_HOSTS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
+    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
+    - |
+      python3 - <<'PY'
+      from pathlib import Path
+      targets = [line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()]
+      provisioned = {line.strip() for line in Path('detect/provisioned_hosts.txt').read_text().splitlines() if line.strip()}
+      selected = [host for host in targets if host in provisioned]
+      Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
+      PY
+    - |
+      if [ ! -s /tmp/ansible_selected_target_names.txt ]; then
+        echo "No provisioned hosts matched TARGET_HOSTS=$TARGET_HOSTS, skipping lifecycle dry-run"
+        exit 0
+      fi
+    - |
+      python3 - <<'PY' > /tmp/ansible_hosts.txt
+      import yaml
+      from pathlib import Path
+      data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
+      targets = {line.strip() for line in Path('/tmp/ansible_selected_target_names.txt').read_text().splitlines() if line.strip()}
+      hosts = []
+      all_hosts = data.get('all', {})
+      def walk_children(node):
+          if not isinstance(node, dict):
+              return
+          host_map = node.get('hosts', {})
+          if isinstance(host_map, dict):
+              for name, attrs in host_map.items():
+                  if name in targets and isinstance(attrs, dict):
+                      host = attrs.get('ansible_host', name)
+                      if host not in hosts:
+                          hosts.append(host)
+          children = node.get('children', {})
+          if isinstance(children, dict):
+              for child in children.values():
+                  walk_children(child)
+      walk_children(all_hosts)
+      for host in hosts:
+          print(host)
+      PY
+    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected dry-run targets" && exit 1)
+    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - chmod 644 .ansible/known_hosts
+    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)'
+  script:
+    - |
+      if [ -z "$RESOLVED_TARGETS" ]; then
+        echo "No provisioned hosts selected, skipping lifecycle dry-run"
+        exit 0
+      fi
+    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+
+ansible-provision-hosts:
+  <<: *default_ansible_job
+  <<: *rules_manual_apply
+  stage: apply
+  needs:
+    - job: ansible-detect-provision-state
+      artifacts: true
+  before_script:
+    - apt-get update
+    - apt-get install -y openssh-client
+    - python -m pip install --upgrade pip
+    - pip install ansible
+    - test -n "$PROVISION_TARGETS" || (echo "PROVISION_TARGETS is required" && exit 1)
+    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - test -n "$SEMAPHORE_AGENT_AUTHORIZED_KEY" || (echo "SEMAPHORE_AGENT_AUTHORIZED_KEY is required" && exit 1)
+    - |
+      python3 - <<'PY'
+      import os
+      key = os.environ.get('SEMAPHORE_AGENT_AUTHORIZED_KEY', '')
+      lines = [line for line in key.splitlines() if line.strip()]
+      first = lines[0].split() if lines else []
+      print('SEMAPHORE_AGENT_AUTHORIZED_KEY diagnostic:')
+      print(f'  raw_length={len(key)}')
+      print(f'  non_empty_lines={len(lines)}')
+      print(f'  first_field={first[0] if len(first) >= 1 else "<missing>"}')
+      print(f'  field_count={len(first)}')
+      print(f'  has_cr={chr(13) in key}')
+      print(f'  starts_with_space={key[:1].isspace() if key else False}')
+      print(f'  ends_with_space={key[-1:].isspace() if key else False}')
+      PY
+    - test -f detect/unprovisioned_hosts.txt || (echo "Detection artifact detect/unprovisioned_hosts.txt is missing" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
+    - chmod 600 ~/.ssh/ci_ansible_key
+    - ansible -i inventory/hosts.yml "$PROVISION_TARGETS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
+    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched PROVISION_TARGETS=$PROVISION_TARGETS" && exit 1)
+    - |
+      python3 - <<'PY'
+      from pathlib import Path
+      targets = [line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()]
+      unprovisioned = {line.strip() for line in Path('detect/unprovisioned_hosts.txt').read_text().splitlines() if line.strip()}
+      selected = [host for host in targets if host in unprovisioned]
+      Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
+      PY
+    - test -s /tmp/ansible_selected_target_names.txt || (echo "No unprovisioned hosts matched PROVISION_TARGETS=$PROVISION_TARGETS" && exit 1)
+    - |
+      python3 - <<'PY' > /tmp/ansible_hosts.txt
+      import yaml
+      from pathlib import Path
+      data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
+      targets = {line.strip() for line in Path('/tmp/ansible_selected_target_names.txt').read_text().splitlines() if line.strip()}
+      hosts = []
+      all_hosts = data.get('all', {})
+      def walk_children(node):
+          if not isinstance(node, dict):
+              return
+          host_map = node.get('hosts', {})
+          if isinstance(host_map, dict):
+              for name, attrs in host_map.items():
+                  if name in targets and isinstance(attrs, dict):
+                      host = attrs.get('ansible_host', name)
+                      if host not in hosts:
+                          hosts.append(host)
+          children = node.get('children', {})
+          if isinstance(children, dict):
+              for child in children.values():
+                  walk_children(child)
+      walk_children(all_hosts)
+      for host in hosts:
+          print(host)
+      PY
+    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected provision targets" && exit 1)
+    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - chmod 644 .ansible/known_hosts
+    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)'
+    - |
+      python3 - <<'PY'
+      import os
+      from pathlib import Path
+      def yaml_quote(value: str) -> str:
+          return "'" + value.replace("'", "''") + "'"
+      Path('/tmp/provision-vars.yml').write_text(
+          f"bootstrap_user: {yaml_quote(os.environ['ANSIBLE_USER'])}\n"
+          f"semaphore_agent_authorized_key: {yaml_quote(os.environ['SEMAPHORE_AGENT_AUTHORIZED_KEY'])}\n"
+      )
+      PY
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/provision-vars.yml
 
 ansible-apply-lifecycle:
   <<: *default_ssh_ansible_job
-  <<: *rules_manual_lifecycle_apply
-  stage: update
+  <<: *rules_manual_apply
+  stage: apply
   needs:
     - job: ansible-validate
     - job: ansible-dry-run-lifecycle
@@ -181,7 +366,7 @@ ansible-apply-lifecycle:
 ansible-apply-updates:
   <<: *default_ssh_ansible_job
   <<: *rules_update
-  stage: update
+  stage: apply
   needs:
     - job: ansible-validate
   before_script:

@@ -1,4 +1,36 @@
 ---
+- name: Check whether Docker CE is already installed
+  ansible.builtin.command: dpkg-query -W -f='${Status}' docker-ce
+  register: docker_ce_installed_check
+  check_mode: false
+  changed_when: false
+  failed_when: false
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Decide whether Docker bootstrap can run in this execution mode
+  ansible.builtin.set_fact:
+    docker_bootstrap_allowed: >-
+      {{ (not ansible_check_mode) or ('install ok installed' in (docker_ce_installed_check.stdout | default(''))) }}
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Explain why Docker bootstrap is skipped during dry-run on fresh hosts
+  ansible.builtin.debug:
+    msg: >-
+      Skipping Docker repo/package bootstrap in check mode because docker-ce is not yet installed on this host.
+      Validate first-time Docker bootstrap with a real apply run instead.
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - ansible_check_mode
+    - not (docker_bootstrap_allowed | default(false))
+
 - name: Remove conflicting Docker packages without purging Docker data
   ansible.builtin.apt:
     name: "{{ docker_conflicting_packages_common + (docker_conflicting_packages_ubuntu if ansible_facts.distribution == 'Ubuntu' else []) }}"
@@ -9,6 +41,7 @@
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
 
 - name: Ensure Docker apt keyring directory exists
   ansible.builtin.file:
@@ -21,6 +54,7 @@
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
 
 - name: Install Docker apt prerequisites
   ansible.builtin.apt:
@@ -33,6 +67,7 @@
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
 
 - name: Download Docker apt GPG key
   ansible.builtin.get_url:
@@ -44,6 +79,7 @@
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
 
 - name: Configure Docker apt repository
   ansible.builtin.copy:
@@ -58,10 +94,47 @@
       Components: stable
       Architectures: {{ ansible_facts.architecture | replace('x86_64', 'amd64') }}
       Signed-By: {{ docker_apt_keyring_path }}
+  register: docker_apt_repo_config
   when:
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
+
+- name: Refresh apt cache after Docker repo changes
+  ansible.builtin.apt:
+    update_cache: true
+  register: docker_apt_cache_refresh
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
+    - docker_apt_repo_config is changed
+
+- name: Check Docker CE package candidate availability
+  ansible.builtin.command: apt-cache policy docker-ce
+  register: docker_ce_policy
+  check_mode: false
+  changed_when: false
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
+
+- name: Fail if Docker CE package is unavailable after repo refresh
+  ansible.builtin.fail:
+    msg: >-
+      docker-ce is not available from configured apt sources on this host even after refreshing cache.
+      apt-cache policy output:
+      {{ docker_ce_policy.stdout | default('no output') }}
+  when:
+    - docker_prep_enabled | bool
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
+    - "'Candidate: (none)' in (docker_ce_policy.stdout | default(''))"
 
 - name: Install standard Docker packages
   ansible.builtin.apt:
@@ -72,6 +145,7 @@
     - docker_prep_enabled | bool
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
+    - docker_bootstrap_allowed | default(true)
 
 - name: Ensure docker-agent group exists
   ansible.builtin.group:
@@ -107,9 +181,15 @@
     append: true
   when: docker_prep_enabled | bool
 
+- name: Gather service facts before managing Docker service
+  ansible.builtin.service_facts:
+  when: docker_prep_enabled | bool
+
 - name: Ensure Docker service is running
   ansible.builtin.service:
     name: "{{ docker_service_name }}"
     state: started
     enabled: true
-  when: docker_prep_enabled | bool
+  when:
+    - docker_prep_enabled | bool
+    - not ansible_check_mode or (ansible_facts.services | default({})).get(docker_service_name + '.service') is not none

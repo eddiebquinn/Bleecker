@@ -114,6 +114,8 @@ Required bootstrap vars:
 * `bootstrap_user`
 * `semaphore_agent_authorized_key`
 
+In CI, the intended path is now to use the same `ANSIBLE_USER` and `SSH_PRIVATE_KEY` values used for normal lifecycle access, with `bootstrap_user` set to that same automation user, rather than maintaining a separate bootstrap SSH key path.
+
 These should be passed at runtime or supplied via a non-committed vars file.
 
 ### 2. `20-baseline.yml`
@@ -132,9 +134,16 @@ Applies recurring baseline configuration using modular roles:
 
 ### Note on `00-detect.yml`
 
-`00-detect.yml` remains in the repository as an experimental detection helper, but it is not part of the default recurring lifecycle path.
+`00-detect.yml` now acts as the lifecycle state detection step used by CI before dry-run, provisioning, and lifecycle apply jobs.
 
-This separation keeps recurring runs reliable and makes new-host onboarding more predictable.
+It checks for the provision marker and writes host lists for:
+- provisioned hosts
+- unprovisioned hosts
+- unreachable hosts
+
+Hosts that are unreachable during detection are still recorded separately, but are treated as unprovisioned for bootstrap workflows so first-contact provisioning can continue without the detect step hard-failing.
+
+This lets the pipeline distinguish between hosts that are ready for recurring lifecycle convergence and hosts that still need first-contact bootstrap.
 
 ## Role-Based Design
 Baseline configuration is implemented as composable Ansible roles under:
@@ -210,6 +219,14 @@ ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml
 
 This repository uses CI checks to make lifecycle changes safer before merge.
 
+The CI flow is lifecycle-aware:
+- validate playbook syntax first
+- detect which targeted hosts are already provisioned
+- dry-run lifecycle only against provisioned hosts
+- allow provisioning only against unprovisioned hosts
+
+This avoids the deadlock where a brand-new host breaks the lifecycle dry-run before the provisioning job can run.
+
 ### `ansible-validate`
 
 Runs syntax checks against the main playbooks on:
@@ -217,6 +234,24 @@ Runs syntax checks against the main playbooks on:
 * commits to the default branch
 
 This catches YAML, playbook, and role wiring errors without contacting any remote hosts.
+
+### `ansible-detect-provision-state`
+
+Runs `playbooks/lifecycle/00-detect.yml` and writes CI artifacts describing which targeted hosts are:
+- already provisioned
+- still unprovisioned
+- unreachable
+
+Default scope:
+
+```bash
+DETECT_TARGETS=managed
+```
+
+Artifacts written:
+- `.ci/detect/provisioned_hosts.txt`
+- `.ci/detect/unprovisioned_hosts.txt`
+- `.ci/detect/unreachable_hosts.txt`
 
 ### `ansible-dry-run-lifecycle`
 
@@ -230,7 +265,18 @@ Default scope:
 TARGET_HOSTS=managed
 ```
 
-This means the dry-run is treated as a real CI gate for the recurring lifecycle path while remaining non-mutating.
+The dry-run now intersects the requested target scope with the detected provisioned host list. Unprovisioned hosts are excluded automatically so the recurring lifecycle gate only applies to hosts that have already completed bootstrap.
+
+### `ansible-provision-hosts`
+
+Runs `playbooks/lifecycle/10-provision.yml` as a manual job for first-contact bootstrap.
+
+Default behaviour:
+- requires explicit `PROVISION_TARGETS`
+- intersects those targets with `.ci/detect/unprovisioned_hosts.txt`
+- fails fast if none of the requested targets are still unprovisioned
+
+This keeps provisioning separate from recurring lifecycle convergence while still making the CI flow aware of actual host state.
 
 ### `ansible-apply-lifecycle`
 
@@ -246,7 +292,7 @@ Default scope:
 LIFECYCLE_TARGETS=managed
 ```
 
-This is intended for deliberate operator-triggered convergence once the non-mutating checks have already passed.
+This job currently runs exactly against the requested `LIFECYCLE_TARGETS` scope rather than intersecting with the detect artifact output. That keeps manual apply flexible while dry-run remains lifecycle-aware.
 
 ### Required CI/CD Variables
 
@@ -305,9 +351,10 @@ UPDATE_TARGETS=managed
 ### Triggering model
 
 * **automatic on scheduled pipelines**
+* **manual on merge request pipelines**
 * **manual from the GitLab web UI** for ad hoc runs started with **Run pipeline**
 
-This keeps routine patching automated while still allowing on-demand update execution when needed.
+This keeps routine patching automated while still allowing on-demand update execution when needed, including MR-side operator testing before merge.
 
 ## CI Integration Model
 
@@ -316,9 +363,11 @@ The repository is designed to support CI-driven infrastructure convergence.
 Typical flow:
 1. Change raised in a merge request
 2. CI runs syntax validation automatically
-3. CI runs a non-mutating dry-run of `site.yml` automatically
-4. Scheduled pipelines can run the update playbook automatically
-5. Manual web-triggered runs remain available for targeted operator actions
+3. CI detects provisioned versus unprovisioned hosts automatically
+4. CI runs a non-mutating dry-run of `site.yml` only against provisioned hosts
+5. Manual provisioning remains available for new hosts
+6. Scheduled pipelines can run the update playbook automatically
+7. Manual web-triggered runs remain available for targeted operator actions
 
 This enables:
 * safer Git-triggered infrastructure changes
