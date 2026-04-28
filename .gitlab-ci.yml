@@ -231,7 +231,6 @@ ansible-provision-hosts:
     - apt-get install -y openssh-client
     - python -m pip install --upgrade pip
     - pip install ansible
-    - test -n "$PROVISION_TARGETS" || (echo "PROVISION_TARGETS is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$SEMAPHORE_AGENT_AUTHORIZED_KEY" || (echo "SEMAPHORE_AGENT_AUTHORIZED_KEY is required" && exit 1)
@@ -251,6 +250,25 @@ ansible-provision-hosts:
       print(f'  ends_with_space={key[-1:].isspace() if key else False}')
       PY
     - test -f detect/unprovisioned_hosts.txt || (echo "Detection artifact detect/unprovisioned_hosts.txt is missing" && exit 1)
+    - |
+      python3 - <<'PY'
+      from pathlib import Path
+      hosts = [line.strip() for line in Path('detect/unprovisioned_hosts.txt').read_text().splitlines() if line.strip()]
+      Path('/tmp/unprovisioned_hosts.txt').write_text('\n'.join(hosts) + ('\n' if hosts else ''))
+      print('Detected unprovisioned hosts: ' + (', '.join(hosts) if hosts else '<none>'))
+      PY
+    - |
+      if [ -z "${PROVISION_TARGETS:-}" ]; then
+        if [ "$(wc -l < /tmp/unprovisioned_hosts.txt)" -eq 1 ]; then
+          export PROVISION_TARGETS="$(head -n 1 /tmp/unprovisioned_hosts.txt)"
+          echo "PROVISION_TARGETS not set; defaulting to sole unprovisioned host: $PROVISION_TARGETS"
+        else
+          echo "PROVISION_TARGETS is required when there are zero or multiple unprovisioned hosts."
+          echo "Available unprovisioned hosts:"
+          sed 's/^/- /' /tmp/unprovisioned_hosts.txt || true
+          exit 1
+        fi
+      fi
     - mkdir -p ~/.ssh .ansible
     - chmod 700 ~/.ssh
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
@@ -265,7 +283,13 @@ ansible-provision-hosts:
       selected = [host for host in targets if host in unprovisioned]
       Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
       PY
-    - test -s /tmp/ansible_selected_target_names.txt || (echo "No unprovisioned hosts matched PROVISION_TARGETS=$PROVISION_TARGETS" && exit 1)
+    - |
+      if [ ! -s /tmp/ansible_selected_target_names.txt ]; then
+        echo "No unprovisioned hosts matched PROVISION_TARGETS=$PROVISION_TARGETS"
+        echo "Available unprovisioned hosts:"
+        sed 's/^/- /' /tmp/unprovisioned_hosts.txt || true
+        exit 1
+      fi
     - |
       python3 - <<'PY' > /tmp/ansible_hosts.txt
       import yaml
