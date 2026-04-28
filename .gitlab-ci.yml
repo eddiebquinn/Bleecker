@@ -291,6 +291,9 @@ ansible-provision-hosts:
         exit 1
       fi
     - |
+      export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)
+      echo "Resolved provision targets: $RESOLVED_TARGETS"
+    - |
       python3 - <<'PY' > /tmp/ansible_hosts.txt
       import yaml
       from pathlib import Path
@@ -319,7 +322,6 @@ ansible-provision-hosts:
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected provision targets" && exit 1)
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
-    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)'
     - |
       python3 - <<'PY'
       import os
