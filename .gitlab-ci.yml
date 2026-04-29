@@ -3,7 +3,7 @@ stages:
   - apply
 
 variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:92feb7c2"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
   TARGET_HOSTS: "managed"
   DETECT_TARGETS: "managed"
@@ -11,26 +11,13 @@ variables:
   UPDATE_TARGETS: "managed"
   PROVISION_MARKER_PATH: "/etc/markers/provisioned"
 
-cache:
-  paths:
-    - .cache/pip
-
 .default_ansible_job: &default_ansible_job
-  image: python:3.12-slim
+  image: "$ANSIBLE_RUNNER_IMAGE"
   allow_failure: false
-  before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
 
 .default_ssh_ansible_job: &default_ssh_ansible_job
   <<: *default_ansible_job
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
     - mkdir -p ~/.ssh .ansible detect
@@ -101,10 +88,6 @@ ansible-detect-provision-state:
       - detect/unprovisioned_hosts.txt
       - detect/unreachable_hosts.txt
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$DETECT_TARGETS" || (echo "DETECT_TARGETS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
@@ -154,10 +137,6 @@ ansible-dry-run-lifecycle:
     - job: ansible-detect-provision-state
       artifacts: true
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$TARGET_HOSTS" || (echo "TARGET_HOSTS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
@@ -227,10 +206,6 @@ ansible-provision-hosts:
     - job: ansible-detect-provision-state
       artifacts: true
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$SEMAPHORE_AGENT_AUTHORIZED_KEY" || (echo "SEMAPHORE_AGENT_AUTHORIZED_KEY is required" && exit 1)
@@ -344,10 +319,6 @@ ansible-apply-lifecycle:
     - job: ansible-validate
     - job: ansible-dry-run-lifecycle
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$LIFECYCLE_TARGETS" || (echo "LIFECYCLE_TARGETS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
@@ -396,10 +367,6 @@ ansible-apply-updates:
   needs:
     - job: ansible-validate
   before_script:
-    - apt-get update
-    - apt-get install -y openssh-client
-    - python -m pip install --upgrade pip
-    - pip install ansible
     - test -n "$UPDATE_TARGETS" || (echo "UPDATE_TARGETS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
