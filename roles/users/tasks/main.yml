@@ -1,4 +1,26 @@
 ---
+- name: Ensure Ubuntu default apt sources use stable archive mirrors
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/ubuntu.sources
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ ubuntu_archive_uri }}
+      Suites: {{ ansible_distribution_release }} {{ ansible_distribution_release }}-updates {{ ansible_distribution_release }}-backports
+      Components: main restricted universe multiverse
+      Signed-By: {{ ubuntu_archive_keyring }}
+
+      Types: deb
+      URIs: {{ ubuntu_security_uri }}
+      Suites: {{ ansible_distribution_release }}-security
+      Components: main restricted universe multiverse
+      Signed-By: {{ ubuntu_archive_keyring }}
+  when:
+    - ansible_facts.distribution == "Ubuntu"
+    - ubuntu_manage_default_sources | bool
+
 - name: Install baseline packages (Debian)
   ansible.builtin.apt:
     name: "{{ baseline_apt_packages }}"
