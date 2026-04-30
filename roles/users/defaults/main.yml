@@ -4,3 +4,7 @@ eddie_groups: []
 eddie_shell: /bin/bash
 eddie_authorized_keys: []
 baseline_apt_packages: []
+ubuntu_manage_default_sources: true
+ubuntu_archive_uri: http://archive.ubuntu.com/ubuntu
+ubuntu_security_uri: http://security.ubuntu.com/ubuntu
+ubuntu_archive_keyring: /usr/share/keyrings/ubuntu-archive-keyring.gpg
