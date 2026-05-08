@@ -13,6 +13,18 @@ komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
 komodo_repo_deploy_key_private: ""
 komodo_git_known_hosts: ""
 
+# Optional Infisical application env export on the managed host
+komodo_infisical_application_sync_enabled: false
+komodo_infisical_project_id: ""
+komodo_infisical_env: "prod"
+komodo_infisical_token: ""
+komodo_infisical_domain: "https://infisical.local.eddiequinn.casa/api"
+komodo_infisical_application_path: "/komodo/application"
+komodo_infisical_core_tags:
+  - core
+komodo_infisical_periphery_tags:
+  - periphery
+
 # Role behaviour toggles (playbook sets these per phase)
 komodo_run_core: false
 komodo_run_periphery: true
