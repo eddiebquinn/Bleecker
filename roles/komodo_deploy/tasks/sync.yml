@@ -84,9 +84,7 @@
       - gnupg
     state: present
     update_cache: true
-  when:
-    - komodo_infisical_application_sync_enabled | bool
-    - ansible_facts.os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Install Infisical CLI (Debian)
   ansible.builtin.shell: |
@@ -96,9 +94,7 @@
     apt-get -qq install -y --no-install-recommends infisical
   args:
     creates: /usr/bin/infisical
-  when:
-    - komodo_infisical_application_sync_enabled | bool
-    - ansible_facts.os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Assert Infisical application export variables are set
   ansible.builtin.assert:
@@ -109,10 +105,19 @@
       - komodo_infisical_core_tags | length > 0
       - komodo_infisical_periphery_tags | length > 0
     fail_msg: >-
-      Infisical application export is enabled but one or more required
-      komodo_infisical_* variables are missing.
+      Standard Komodo deploy now expects Infisical application export settings.
+      Set the required komodo_infisical_* variables before running deploys.
   changed_when: false
-  when: komodo_infisical_application_sync_enabled | bool
+
+- name: Remove existing Komodo core env before Infisical export
+  ansible.builtin.file:
+    path: "{{ komodo_repo_dest }}/core/.env"
+    state: absent
+
+- name: Remove existing Komodo periphery env before Infisical export
+  ansible.builtin.file:
+    path: "{{ komodo_repo_dest }}/periphery/.env"
+    state: absent
 
 - name: Export Komodo core env from Infisical
   ansible.builtin.command:
@@ -130,7 +135,6 @@
     INFISICAL_TOKEN: "{{ komodo_infisical_token }}"
     INFISICAL_DISABLE_UPDATE_CHECK: "true"
   no_log: true
-  when: komodo_infisical_application_sync_enabled | bool
 
 - name: Export Komodo periphery env from Infisical
   ansible.builtin.command:
@@ -148,4 +152,3 @@
     INFISICAL_TOKEN: "{{ komodo_infisical_token }}"
     INFISICAL_DISABLE_UPDATE_CHECK: "true"
   no_log: true
-  when: komodo_infisical_application_sync_enabled | bool
