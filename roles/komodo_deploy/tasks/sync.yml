@@ -104,33 +104,10 @@
       - komodo_infisical_application_path | length > 0
       - komodo_infisical_core_tags | length > 0
       - komodo_infisical_periphery_tags | length > 0
-      - (komodo_infisical_basic_auth_user | length == 0 and komodo_infisical_basic_auth_password | length == 0) or (komodo_infisical_basic_auth_user | length > 0 and komodo_infisical_basic_auth_password | length > 0)
     fail_msg: >-
       Standard Komodo deploy now expects Infisical application export settings.
       Set the required komodo_infisical_* variables before running deploys.
-      If using basic auth, provide both komodo_infisical_basic_auth_user and
-      komodo_infisical_basic_auth_password.
   changed_when: false
-
-- name: Build effective Infisical API domain
-  ansible.builtin.set_fact:
-    komodo_infisical_effective_domain: >-
-      {{
-        komodo_infisical_domain
-        if (komodo_infisical_basic_auth_user | length == 0)
-        else (
-          komodo_infisical_domain
-          | regex_replace(
-              '^(https?://)',
-              '\\1' ~
-              (komodo_infisical_basic_auth_user | urlencode) ~
-              ':' ~
-              (komodo_infisical_basic_auth_password | urlencode) ~
-              '@'
-            )
-        )
-      }}
-  no_log: true
 
 - name: Remove existing Komodo core env before Infisical export
   ansible.builtin.file:
@@ -150,7 +127,7 @@
       - "--projectId={{ komodo_infisical_project_id }}"
       - "--env={{ komodo_infisical_env }}"
       - "--path={{ komodo_infisical_application_path }}"
-      - "--domain={{ komodo_infisical_effective_domain }}"
+      - "--domain={{ komodo_infisical_domain }}"
       - "--tags={{ komodo_infisical_core_tags | join(',') }}"
       - --format=dotenv
       - "--output-file={{ komodo_repo_dest }}/core/.env"
@@ -167,7 +144,7 @@
       - "--projectId={{ komodo_infisical_project_id }}"
       - "--env={{ komodo_infisical_env }}"
       - "--path={{ komodo_infisical_application_path }}"
-      - "--domain={{ komodo_infisical_effective_domain }}"
+      - "--domain={{ komodo_infisical_domain }}"
       - "--tags={{ komodo_infisical_periphery_tags | join(',') }}"
       - --format=dotenv
       - "--output-file={{ komodo_repo_dest }}/periphery/.env"
