@@ -51,7 +51,6 @@
     owner: root
     group: root
     mode: "0600"
-  no_log: true
 
 - name: Write pinned known_hosts for Komodo git server
   ansible.builtin.copy:
@@ -135,7 +134,6 @@
   environment:
     INFISICAL_TOKEN: "{{ komodo_infisical_token }}"
     INFISICAL_DISABLE_UPDATE_CHECK: "true"
-  no_log: true
 
 - name: Export Komodo periphery env from Infisical
   ansible.builtin.command:
