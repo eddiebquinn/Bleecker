@@ -17,7 +17,7 @@ komodo_git_known_hosts: ""
 komodo_infisical_project_id: ""
 komodo_infisical_env: "prod"
 komodo_infisical_token: ""
-komodo_infisical_domain: "https://infisical.local.eddiequinn.casa/api"
+komodo_infisical_domain: "https://infisical.eddiequinn.casa/api"
 komodo_infisical_application_path: "/komodo/application"
 komodo_infisical_core_tags:
   - core
