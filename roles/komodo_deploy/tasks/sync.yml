@@ -94,6 +94,7 @@
     apt-get -qq install -y --no-install-recommends infisical
   args:
     creates: /usr/bin/infisical
+    executable: /bin/bash
   when: ansible_facts.os_family == "Debian"
 
 - name: Assert Infisical application export variables are set
