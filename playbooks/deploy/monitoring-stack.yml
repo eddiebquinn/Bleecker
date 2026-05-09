@@ -1,0 +1,59 @@
+---
+- name: Sync monitoring stack repo to docker hosts
+  hosts: docker_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Sync monitoring stack repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Monitoring stack"
+        compose_repo_url: "{{ monitoring_repo_url }}"
+        compose_repo_dest: "{{ monitoring_repo_dest }}"
+        compose_repo_branch: "{{ monitoring_repo_branch }}"
+        compose_deploy_script: "{{ monitoring_deploy_script }}"
+        compose_repo_ssh_dir: "{{ monitoring_repo_ssh_dir }}"
+        compose_repo_ssh_key_path: "{{ monitoring_repo_ssh_key_path }}"
+        compose_repo_known_hosts_path: "{{ monitoring_repo_known_hosts_path }}"
+        compose_repo_deploy_key_private: "{{ monitoring_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ monitoring_git_known_hosts }}"
+      tags: [sync, core, exporters]
+
+- name: Deploy monitoring core to designated hosts
+  hosts: docker_hosts
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Run monitoring core deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Monitoring stack"
+        compose_repo_dest: "{{ monitoring_repo_dest }}"
+        compose_deploy_script: "{{ monitoring_deploy_script }}"
+        compose_deploy_args:
+          - --core
+      when: (monitoring_core | default(false)) | bool
+      tags: [core]
+
+- name: Deploy monitoring exporters to docker hosts
+  hosts: docker_hosts
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Run monitoring exporter deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Monitoring stack"
+        compose_repo_dest: "{{ monitoring_repo_dest }}"
+        compose_deploy_script: "{{ monitoring_deploy_script }}"
+        compose_deploy_args:
+          - --exporters
+      tags: [exporters]
