@@ -1,0 +1,6 @@
+---
+- name: Sync compose repo
+  ansible.builtin.include_tasks: sync.yml
+
+- name: Run compose repo deploy script
+  ansible.builtin.include_tasks: run.yml

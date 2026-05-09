@@ -18,5 +18,15 @@ komodo_repo_ssh_dir: "/etc/komodo/ssh"
 komodo_repo_ssh_key_path: "/etc/komodo/ssh/id_ed25519"
 komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
 
+# Monitoring stack vars
+monitoring_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/monitoring-stack.git"
+monitoring_repo_dest: "/etc/monitoring-stack/repos/monitoring-stack"
+monitoring_repo_branch: "master"
+monitoring_deploy_script: "./deploy.sh"
+
+monitoring_repo_ssh_dir: "/etc/monitoring-stack/ssh"
+monitoring_repo_ssh_key_path: "/etc/monitoring-stack/ssh/id_ed25519"
+monitoring_repo_known_hosts_path: "/etc/monitoring-stack/ssh/known_hosts"
+
 # Docker package management is enabled so fresh Docker hosts can bootstrap cleanly
 docker_manage_packages: true

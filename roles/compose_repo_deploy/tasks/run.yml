@@ -1,0 +1,7 @@
+---
+- name: Run compose deploy script
+  ansible.builtin.command:
+    argv: "{{ ['sh', compose_deploy_script] + (compose_deploy_args | default([])) }}"
+  args:
+    chdir: "{{ compose_repo_dest }}"
+  changed_when: true

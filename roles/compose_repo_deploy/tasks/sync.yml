@@ -1,0 +1,77 @@
+---
+- name: Include compose repo assertions
+  ansible.builtin.include_tasks: assert.yml
+
+- name: Install git (Debian)
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure compose repo base directory exists
+  ansible.builtin.file:
+    path: "{{ compose_repo_dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure compose repo directory exists with consistent ownership
+  ansible.builtin.file:
+    path: "{{ compose_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mark compose repo path as a safe Git directory for root
+  ansible.builtin.command:
+    argv:
+      - git
+      - config
+      - --global
+      - --add
+      - safe.directory
+      - "{{ compose_repo_dest }}"
+  changed_when: false
+
+- name: Ensure compose SSH directory exists
+  ansible.builtin.file:
+    path: "{{ compose_repo_ssh_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write compose repo deploy key (from CI)
+  ansible.builtin.copy:
+    dest: "{{ compose_repo_ssh_key_path }}"
+    content: "{{ compose_repo_deploy_key_private }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Write pinned known_hosts for compose git server
+  ansible.builtin.copy:
+    dest: "{{ compose_repo_known_hosts_path }}"
+    content: "{{ compose_git_known_hosts }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Clone/update compose repo (using pinned host key + deploy key)
+  ansible.builtin.git:
+    repo: "{{ compose_repo_url }}"
+    dest: "{{ compose_repo_dest }}"
+    version: "{{ compose_repo_branch }}"
+    update: true
+    force: true
+    key_file: "{{ compose_repo_ssh_key_path }}"
+    accept_hostkey: false
+  environment:
+    GIT_SSH_COMMAND: >-
+      ssh
+      -o UserKnownHostsFile={{ compose_repo_known_hosts_path }}
+      -o StrictHostKeyChecking=yes

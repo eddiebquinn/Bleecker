@@ -1,0 +1,32 @@
+---
+- name: Assert required compose repo variables are set
+  ansible.builtin.assert:
+    that:
+      - compose_repo_url is defined
+      - compose_repo_url | length > 0
+      - compose_repo_dest is defined
+      - compose_repo_dest | length > 0
+      - compose_repo_ssh_dir is defined
+      - compose_repo_ssh_dir | length > 0
+      - compose_repo_ssh_key_path is defined
+      - compose_repo_ssh_key_path | length > 0
+      - compose_repo_known_hosts_path is defined
+      - compose_repo_known_hosts_path | length > 0
+    fail_msg: "{{ compose_repo_label }} vars missing. Set repo URL/destination/SSH paths before running this role."
+  changed_when: false
+
+- name: Assert deploy key provided for compose repo clone
+  ansible.builtin.assert:
+    that:
+      - compose_repo_deploy_key_private is defined
+      - compose_repo_deploy_key_private | length > 0
+    fail_msg: "{{ compose_repo_label }} deploy key not provided. Pass it via CI (-e) or inventory."
+  changed_when: false
+
+- name: Assert pinned known_hosts provided for compose git server
+  ansible.builtin.assert:
+    that:
+      - compose_git_known_hosts is defined
+      - compose_git_known_hosts | length > 0
+    fail_msg: "{{ compose_repo_label }} git known_hosts not provided. Pass pinned ssh-keyscan output via CI (-e)."
+  changed_when: false
