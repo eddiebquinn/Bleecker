@@ -1,0 +1,15 @@
+---
+compose_repo_label: "Compose repo"
+compose_repo_url: ""
+compose_repo_dest: ""
+compose_repo_branch: "master"
+compose_deploy_script: "./deploy.sh"
+
+compose_repo_ssh_dir: ""
+compose_repo_ssh_key_path: ""
+compose_repo_known_hosts_path: ""
+
+compose_repo_deploy_key_private: ""
+compose_git_known_hosts: ""
+
+compose_deploy_args: []
