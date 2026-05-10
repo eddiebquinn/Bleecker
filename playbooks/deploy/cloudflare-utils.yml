@@ -40,6 +40,22 @@
             tags: "{{ cloudflare_utils_infisical_tags }}"
       tags: [sync, core]
 
+    - name: Check exported Cloudflare Utils env file
+      ansible.builtin.stat:
+        path: "{{ cloudflare_utils_repo_dest }}/.env"
+      register: cloudflare_utils_env_file
+      changed_when: false
+
+    - name: Assert Cloudflare Utils env file is not empty
+      ansible.builtin.assert:
+        that:
+          - cloudflare_utils_env_file.stat.exists
+          - (cloudflare_utils_env_file.stat.size | int) > 0
+        fail_msg: >-
+          Cloudflare Utils exported .env is missing or empty at {{ cloudflare_utils_repo_dest }}/.env.
+          Check the Infisical path/tags/env for cloudflare-utils application secrets.
+      changed_when: false
+
 - name: Deploy Cloudflare Utils to selected docker hosts
   hosts: "{{ cloudflare_utils_deploy_targets | default('cloudflare_utils_targets_missing') }}"
   become: true
