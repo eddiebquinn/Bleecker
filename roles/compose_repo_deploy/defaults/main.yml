@@ -12,4 +12,11 @@ compose_repo_known_hosts_path: ""
 compose_repo_deploy_key_private: ""
 compose_git_known_hosts: ""
 
+compose_repo_infisical_application_sync_enabled: false
+compose_repo_infisical_project_id: ""
+compose_repo_infisical_env: "prod"
+compose_repo_infisical_token: ""
+compose_repo_infisical_domain: "https://infisical.eddiequinn.casa/api"
+compose_repo_env_exports: []
+
 compose_deploy_args: []

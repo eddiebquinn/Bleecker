@@ -30,3 +30,18 @@ monitoring_repo_known_hosts_path: "/etc/monitoring-stack/ssh/known_hosts"
 
 # Docker package management is enabled so fresh Docker hosts can bootstrap cleanly
 docker_manage_packages: true
+
+# Cloudflare Utils vars
+cloudflare_utils_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/cloudflare-utils.git"
+cloudflare_utils_repo_dest: "/etc/komodo/repos/cloudflare-utils"
+cloudflare_utils_repo_branch: "master"
+cloudflare_utils_deploy_script: "./deploy.sh"
+
+cloudflare_utils_repo_ssh_dir: "/etc/cloudflare-utils/ssh"
+cloudflare_utils_repo_ssh_key_path: "/etc/cloudflare-utils/ssh/id_ed25519"
+cloudflare_utils_repo_known_hosts_path: "/etc/cloudflare-utils/ssh/known_hosts"
+
+cloudflare_utils_infisical_application_sync_enabled: true
+cloudflare_utils_infisical_env: "prod"
+cloudflare_utils_infisical_domain: "https://infisical.eddiequinn.casa/api"
+cloudflare_utils_infisical_application_path: "/cloudflare-utils/application"
