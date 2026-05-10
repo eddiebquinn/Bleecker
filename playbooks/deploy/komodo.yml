@@ -1,9 +1,21 @@
 ---
-- name: Sync Komodo repo to docker hosts
-  hosts: docker_hosts
+- name: Sync Komodo repo to selected docker hosts
+  hosts: "{{ [komodo_core_deploy_targets | default(''), komodo_periphery_deploy_targets | default('')] | reject('equalto', '') | join(':') if (komodo_core_deploy_targets is defined and komodo_periphery_deploy_targets is defined) else 'komodo_targets_missing' }}"
   become: true
   gather_facts: true
   tasks:
+    - name: Assert Komodo sync targets were provided
+      ansible.builtin.assert:
+        that:
+          - komodo_core_deploy_targets is defined
+          - komodo_core_deploy_targets | length > 0
+          - komodo_periphery_deploy_targets is defined
+          - komodo_periphery_deploy_targets | length > 0
+        fail_msg: >-
+          Komodo deploy requires both komodo_core_deploy_targets and
+          komodo_periphery_deploy_targets so sync can cover every target host.
+      changed_when: false
+
     - name: Sync repo
       ansible.builtin.include_role:
         name: compose_repo_deploy
@@ -22,11 +34,21 @@
       tags: [sync, core, periphery]
 
 - name: Deploy Komodo Core
-  hosts: docker_hosts
+  hosts: "{{ komodo_core_deploy_targets | default('komodo_targets_missing') }}"
   become: true
   gather_facts: false
 
   tasks:
+    - name: Assert Komodo core deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - komodo_core_deploy_targets is defined
+          - komodo_core_deploy_targets | length > 0
+        fail_msg: >-
+          Komodo core deploy requires komodo_core_deploy_targets.
+          Pass it from CI to choose the core target host(s).
+      changed_when: false
+
     - name: Run Komodo core deployment
       ansible.builtin.include_role:
         name: compose_repo_deploy
@@ -37,15 +59,24 @@
         compose_deploy_script: "{{ komodo_deploy_script }}"
         compose_deploy_args:
           - --core
-      when: (komodo_core | default(false)) | bool
       tags: [core]
 
 - name: Deploy Komodo Periphery
-  hosts: docker_hosts
+  hosts: "{{ komodo_periphery_deploy_targets | default('komodo_targets_missing') }}"
   become: true
   gather_facts: false
 
   tasks:
+    - name: Assert Komodo periphery deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - komodo_periphery_deploy_targets is defined
+          - komodo_periphery_deploy_targets | length > 0
+        fail_msg: >-
+          Komodo periphery deploy requires komodo_periphery_deploy_targets.
+          Pass it from CI to choose the periphery target host(s).
+      changed_when: false
+
     - name: Run Komodo periphery deployment
       ansible.builtin.include_role:
         name: compose_repo_deploy
