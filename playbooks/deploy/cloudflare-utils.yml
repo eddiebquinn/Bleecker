@@ -37,7 +37,6 @@
         compose_repo_env_exports:
           - path: ".env"
             path_in_infisical: "{{ cloudflare_utils_infisical_application_path }}"
-            tags: "{{ cloudflare_utils_infisical_tags }}"
       tags: [sync, core]
 
     - name: Check exported Cloudflare Utils env file
