@@ -22,7 +22,7 @@
         compose_repo_label: "Cloudflare Utils"
         compose_repo_url: "{{ cloudflare_utils_repo_url }}"
         compose_repo_dest: "{{ cloudflare_utils_repo_dest }}"
-        compose_repo_branch: "{{ cloudflare_utils_repo_branch }}"
+        compose_repo_branch: "{{ (lookup('ansible.builtin.env', 'DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH', default='') | trim) or cloudflare_utils_repo_branch }}"
         compose_deploy_script: "{{ cloudflare_utils_deploy_script }}"
         compose_repo_ssh_dir: "{{ cloudflare_utils_repo_ssh_dir }}"
         compose_repo_ssh_key_path: "{{ cloudflare_utils_repo_ssh_key_path }}"
