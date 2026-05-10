@@ -23,7 +23,6 @@
       vars:
         compose_repo_label: "Monitoring stack"
         compose_repo_url: "{{ monitoring_repo_url }}"
-        compose_repo_dest: "{{ monitoring_repo_dest }}"
         compose_repo_branch: "{{ monitoring_repo_branch }}"
         compose_deploy_script: "{{ monitoring_deploy_script }}"
         compose_repo_ssh_dir: "{{ monitoring_repo_ssh_dir }}"
@@ -55,7 +54,7 @@
         tasks_from: run
       vars:
         compose_repo_label: "Monitoring stack"
-        compose_repo_dest: "{{ monitoring_repo_dest }}"
+        compose_repo_url: "{{ monitoring_repo_url }}"
         compose_deploy_script: "{{ monitoring_deploy_script }}"
         compose_deploy_args:
           - --core
@@ -83,7 +82,7 @@
         tasks_from: run
       vars:
         compose_repo_label: "Monitoring stack"
-        compose_repo_dest: "{{ monitoring_repo_dest }}"
+        compose_repo_url: "{{ monitoring_repo_url }}"
         compose_deploy_script: "{{ monitoring_deploy_script }}"
         compose_deploy_args:
           - --exporters
