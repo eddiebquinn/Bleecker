@@ -1,9 +1,21 @@
 ---
-- name: Sync monitoring stack repo to docker hosts
-  hosts: docker_hosts
+- name: Sync monitoring stack repo to selected docker hosts
+  hosts: "{{ [monitoring_core_deploy_targets | default(''), monitoring_exporter_deploy_targets | default('')] | reject('equalto', '') | join(':') if (monitoring_core_deploy_targets is defined and monitoring_exporter_deploy_targets is defined) else 'monitoring_targets_missing' }}"
   become: true
   gather_facts: true
   tasks:
+    - name: Assert monitoring sync targets were provided
+      ansible.builtin.assert:
+        that:
+          - monitoring_core_deploy_targets is defined
+          - monitoring_core_deploy_targets | length > 0
+          - monitoring_exporter_deploy_targets is defined
+          - monitoring_exporter_deploy_targets | length > 0
+        fail_msg: >-
+          Monitoring deploy requires both monitoring_core_deploy_targets and
+          monitoring_exporter_deploy_targets so sync can cover every target host.
+      changed_when: false
+
     - name: Sync monitoring stack repo
       ansible.builtin.include_role:
         name: compose_repo_deploy
@@ -22,11 +34,21 @@
       tags: [sync, core, exporters]
 
 - name: Deploy monitoring core to designated hosts
-  hosts: docker_hosts
+  hosts: "{{ monitoring_core_deploy_targets | default('monitoring_targets_missing') }}"
   become: true
   gather_facts: false
 
   tasks:
+    - name: Assert monitoring core deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - monitoring_core_deploy_targets is defined
+          - monitoring_core_deploy_targets | length > 0
+        fail_msg: >-
+          Monitoring core deploy requires monitoring_core_deploy_targets.
+          Pass it from CI to choose the core target host(s).
+      changed_when: false
+
     - name: Run monitoring core deployment
       ansible.builtin.include_role:
         name: compose_repo_deploy
@@ -37,15 +59,24 @@
         compose_deploy_script: "{{ monitoring_deploy_script }}"
         compose_deploy_args:
           - --core
-      when: (monitoring_core | default(false)) | bool
       tags: [core]
 
-- name: Deploy monitoring exporters to docker hosts
-  hosts: docker_hosts
+- name: Deploy monitoring exporters to designated hosts
+  hosts: "{{ monitoring_exporter_deploy_targets | default('monitoring_targets_missing') }}"
   become: true
   gather_facts: false
 
   tasks:
+    - name: Assert monitoring exporter deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - monitoring_exporter_deploy_targets is defined
+          - monitoring_exporter_deploy_targets | length > 0
+        fail_msg: >-
+          Monitoring exporter deploy requires monitoring_exporter_deploy_targets.
+          Pass it from CI to choose the exporter target host(s).
+      changed_when: false
+
     - name: Run monitoring exporter deployment
       ansible.builtin.include_role:
         name: compose_repo_deploy
