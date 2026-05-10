@@ -75,3 +75,68 @@
       ssh
       -o UserKnownHostsFile={{ compose_repo_known_hosts_path }}
       -o StrictHostKeyChecking=yes
+
+- name: Install Infisical CLI prerequisites (Debian)
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+  when:
+    - compose_repo_infisical_application_sync_enabled | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Install Infisical CLI (Debian)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | bash
+    apt-get -qq update
+    apt-get -qq install -y --no-install-recommends infisical
+  args:
+    creates: /usr/bin/infisical
+    executable: /bin/bash
+  when:
+    - compose_repo_infisical_application_sync_enabled | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Assert Infisical application export variables are set
+  ansible.builtin.assert:
+    that:
+      - compose_repo_infisical_project_id | length > 0
+      - compose_repo_infisical_token | length > 0
+      - compose_repo_env_exports | length > 0
+      - compose_repo_env_exports | selectattr('path', 'defined') | list | length == compose_repo_env_exports | length
+      - compose_repo_env_exports | selectattr('tags', 'defined') | list | length == compose_repo_env_exports | length
+    fail_msg: >-
+      {{ compose_repo_label }} Infisical application sync is enabled but one or more
+      required compose_repo_infisical_* settings are missing.
+  changed_when: false
+  when: compose_repo_infisical_application_sync_enabled | bool
+
+- name: Remove existing compose env files before Infisical export
+  ansible.builtin.file:
+    path: "{{ compose_repo_dest }}/{{ item.path }}"
+    state: absent
+  loop: "{{ compose_repo_env_exports }}"
+  when: compose_repo_infisical_application_sync_enabled | bool
+
+- name: Export compose env files from Infisical
+  ansible.builtin.command:
+    argv:
+      - infisical
+      - export
+      - "--projectId={{ compose_repo_infisical_project_id }}"
+      - "--env={{ compose_repo_infisical_env }}"
+      - "--path={{ item.path_in_infisical | default('/') }}"
+      - "--domain={{ compose_repo_infisical_domain }}"
+      - "--tags={{ item.tags | join(',') }}"
+      - --format=dotenv
+      - "--output-file={{ compose_repo_dest }}/{{ item.path }}"
+  environment:
+    INFISICAL_TOKEN: "{{ compose_repo_infisical_token }}"
+    INFISICAL_DISABLE_UPDATE_CHECK: "true"
+  loop: "{{ compose_repo_env_exports }}"
+  no_log: true
+  when: compose_repo_infisical_application_sync_enabled | bool
