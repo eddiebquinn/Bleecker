@@ -40,7 +40,7 @@
 
     - name: Check exported Cloudflare Utils env file
       ansible.builtin.stat:
-        path: "{{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\.git$', '') }}/.env"
+        path: "{{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\\.git$', '') }}/.env"
       register: cloudflare_utils_env_file
       changed_when: false
 
@@ -50,7 +50,7 @@
           - cloudflare_utils_env_file.stat.exists
           - (cloudflare_utils_env_file.stat.size | int) > 0
         fail_msg: >-
-          Cloudflare Utils exported .env is missing or empty at {{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\.git$', '') }}/.env.
+          Cloudflare Utils exported .env is missing or empty at {{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\\.git$', '') }}/.env.
           Check the Infisical path/tags/env for cloudflare-utils application secrets.
       changed_when: false
 
