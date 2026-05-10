@@ -8,9 +8,10 @@ docker_agent_shell: /usr/sbin/nologin
 
 docker_service_name: docker
 
+compose_repo_root: "/etc/komodo/repos"
+
 # Komodo Vars
 komodo_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/komodo.git"
-komodo_repo_dest: "/etc/komodo/repos/komodo"
 komodo_repo_branch: "master"
 komodo_deploy_script: "./deploy.sh"
 
@@ -20,7 +21,6 @@ komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
 
 # Monitoring stack vars
 monitoring_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/monitoring-stack.git"
-monitoring_repo_dest: "/etc/monitoring-stack/repos/monitoring-stack"
 monitoring_repo_branch: "master"
 monitoring_deploy_script: "./deploy.sh"
 
@@ -33,7 +33,6 @@ docker_manage_packages: true
 
 # Cloudflare Utils vars
 cloudflare_utils_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/cloudflare-utils.git"
-cloudflare_utils_repo_dest: "/etc/komodo/repos/cloudflare-utils"
 cloudflare_utils_repo_branch: "master"
 cloudflare_utils_deploy_script: "./deploy.sh"
 
