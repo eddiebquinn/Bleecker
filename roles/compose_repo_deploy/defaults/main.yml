@@ -1,7 +1,9 @@
 ---
 compose_repo_label: "Compose repo"
 compose_repo_url: ""
-compose_repo_dest: ""
+compose_repo_root: "/etc/komodo/repos"
+compose_repo_name: "{{ (compose_repo_url | basename | regex_replace('\\.git$', '')) if (compose_repo_url | default('') | length > 0) else '' }}"
+compose_repo_dest: "{{ (compose_repo_root ~ '/' ~ compose_repo_name) if (compose_repo_name | default('') | length > 0) else '' }}"
 compose_repo_branch: "master"
 compose_deploy_script: "./deploy.sh"
 
