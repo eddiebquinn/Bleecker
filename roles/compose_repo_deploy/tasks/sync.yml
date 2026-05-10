@@ -108,7 +108,6 @@
       - compose_repo_infisical_token | length > 0
       - compose_repo_env_exports | length > 0
       - compose_repo_env_exports | selectattr('path', 'defined') | list | length == compose_repo_env_exports | length
-      - compose_repo_env_exports | selectattr('tags', 'defined') | list | length == compose_repo_env_exports | length
     fail_msg: >-
       {{ compose_repo_label }} Infisical application sync is enabled but one or more
       required compose_repo_infisical_* settings are missing.
@@ -124,19 +123,23 @@
 
 - name: Export compose env files from Infisical
   ansible.builtin.command:
-    argv:
-      - infisical
-      - export
-      - "--projectId={{ compose_repo_infisical_project_id }}"
-      - "--env={{ compose_repo_infisical_env }}"
-      - "--path={{ item.path_in_infisical | default('/') }}"
-      - "--domain={{ compose_repo_infisical_domain }}"
-      - "--tags={{ item.tags | join(',') }}"
-      - --format=dotenv
-      - "--output-file={{ compose_repo_dest }}/{{ item.path }}"
+    argv: "{{ compose_repo_infisical_export_argv }}"
   environment:
     INFISICAL_TOKEN: "{{ compose_repo_infisical_token }}"
     INFISICAL_DISABLE_UPDATE_CHECK: "true"
   loop: "{{ compose_repo_env_exports }}"
+  vars:
+    compose_repo_infisical_export_argv: >-
+      {{ [
+        'infisical',
+        'export',
+        '--projectId=' ~ compose_repo_infisical_project_id,
+        '--env=' ~ compose_repo_infisical_env,
+        '--path=' ~ (item.path_in_infisical | default('/')),
+        '--domain=' ~ compose_repo_infisical_domain,
+        '--format=dotenv',
+        '--output-file=' ~ compose_repo_dest ~ '/' ~ item.path
+      ] +
+      ([ '--tags=' ~ (item.tags | join(',')) ] if (item.tags is defined and (item.tags | length > 0)) else []) }}
   no_log: true
   when: compose_repo_infisical_application_sync_enabled | bool
