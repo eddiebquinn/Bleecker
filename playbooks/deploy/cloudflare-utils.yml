@@ -14,14 +14,6 @@
           Pass it from CI to choose the target host(s) explicitly.
       changed_when: false
 
-    - name: Debug Cloudflare Utils repo branch inputs
-      ansible.builtin.debug:
-        msg:
-          - "DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH={{ lookup('ansible.builtin.env', 'DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH', default='__UNSET__') }}"
-          - "cloudflare_utils_repo_branch={{ cloudflare_utils_repo_branch }}"
-          - "resolved_compose_repo_branch={{ (lookup('ansible.builtin.env', 'DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH', default='') | trim) or cloudflare_utils_repo_branch }}"
-      changed_when: false
-
     - name: Sync Cloudflare Utils repo
       ansible.builtin.include_role:
         name: compose_repo_deploy
