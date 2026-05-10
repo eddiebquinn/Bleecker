@@ -33,7 +33,7 @@ docker_manage_packages: true
 
 # Cloudflare Utils vars
 cloudflare_utils_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/cloudflare-utils.git"
-cloudflare_utils_repo_dest: "/etc/cloudflare-utils/repos/cloudflare-utils"
+cloudflare_utils_repo_dest: "/etc/komodo/repos/cloudflare-utils"
 cloudflare_utils_repo_branch: "master"
 cloudflare_utils_deploy_script: "./deploy.sh"
 
