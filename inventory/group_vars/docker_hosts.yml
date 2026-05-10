@@ -45,5 +45,3 @@ cloudflare_utils_infisical_application_sync_enabled: true
 cloudflare_utils_infisical_env: "prod"
 cloudflare_utils_infisical_domain: "https://infisical.eddiequinn.casa/api"
 cloudflare_utils_infisical_application_path: "/cloudflare-utils/application"
-cloudflare_utils_infisical_tags:
-  - cloudflare-utils
