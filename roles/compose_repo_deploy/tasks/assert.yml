@@ -4,6 +4,8 @@
     that:
       - compose_repo_url is defined
       - compose_repo_url | length > 0
+      - compose_repo_root is defined
+      - compose_repo_root | length > 0
       - compose_repo_dest is defined
       - compose_repo_dest | length > 0
       - compose_repo_ssh_dir is defined
@@ -12,7 +14,7 @@
       - compose_repo_ssh_key_path | length > 0
       - compose_repo_known_hosts_path is defined
       - compose_repo_known_hosts_path | length > 0
-    fail_msg: "{{ compose_repo_label }} vars missing. Set repo URL/destination/SSH paths before running this role."
+    fail_msg: "{{ compose_repo_label }} vars missing. Set repo URL/root/SSH paths before running this role."
   changed_when: false
 
 - name: Assert deploy key provided for compose repo clone
