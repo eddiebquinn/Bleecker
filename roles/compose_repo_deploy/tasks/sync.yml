@@ -1,4 +1,7 @@
 ---
+- name: Derive compose repo paths
+  ansible.builtin.include_tasks: derive.yml
+
 - name: Include compose repo assertions
   ansible.builtin.include_tasks: assert.yml
 
