@@ -35,7 +35,10 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   │   ├── 20-baseline.yml
 │   │   └── 30-apt-upgrade.yml
 │   ├── deploy/
-│   │   └── komodo.yml
+│   │   ├── cloudflare-utils.yml
+│   │   ├── komodo.yml
+│   │   ├── monitoring-stack.yml
+│   │   └── renovate.yml
 │   └── discovery/
 │       └── docker-state.yml
 ├── roles/
@@ -328,6 +331,141 @@ forks = 5
 ```
 
 This lower parallelism was chosen after CI dry-run testing showed it to be more reliable across the full managed estate, especially the k3s hosts.
+
+## Compose Deploy Playbooks
+
+Compose-based application deploys live under:
+
+```bash
+playbooks/deploy/
+```
+
+Current playbooks:
+- `playbooks/deploy/komodo.yml`
+- `playbooks/deploy/monitoring-stack.yml`
+- `playbooks/deploy/cloudflare-utils.yml`
+- `playbooks/deploy/renovate.yml`
+
+These playbooks now follow a more generic contract:
+- shared path conventions come from inventory (`deploy_root`, `ssh_root`, `compose_repo_root`)
+- standard repo URLs are derived from `compose_git_base_url + compose_app_name`
+- standard repo branch override env vars are derived from app name
+- standard deploy script defaults to `./deploy.sh`
+- standard Infisical application path defaults to `/<app-name>/application`
+- app-specific targets, credentials, and secret-manager values are still injected at runtime
+
+### Shared defaults and derivation
+
+These values are now shared and do not usually need per-app variables:
+
+- `compose_git_base_url`
+  - defaulted in inventory
+  - used to derive `ssh://.../<app>.git`
+- `compose_repo_branch`
+  - defaults to `master`
+  - can be overridden with `DEPLOYMENT_<APP>_REPO_BRANCH`
+- `compose_deploy_script`
+  - defaults to `./deploy.sh`
+- `compose_repo_infisical_domain`
+  - defaults from `infisical_domain`
+- `compose_repo_infisical_application_path`
+  - defaults to `/<app-name>/application`
+- `compose_repo_env_exports`
+  - defaults to exporting `.env` when Infisical sync is enabled
+
+### Required runtime inputs by deploy playbook
+
+These should normally come from CI/CD variables or manual `-e` inputs rather than committed inventory.
+
+#### Komodo
+
+Required:
+- `komodo_core_deploy_targets`
+- `komodo_periphery_deploy_targets`
+- `komodo_repo_deploy_key_private`
+- `komodo_git_known_hosts`
+
+Optional:
+- `DEPLOYMENT_KOMODO_REPO_BRANCH`
+  - overrides repo branch
+
+#### Monitoring stack
+
+Required:
+- `monitoring_core_deploy_targets`
+- `monitoring_exporter_deploy_targets`
+- `monitoring_repo_deploy_key_private`
+- `monitoring_git_known_hosts`
+
+Optional:
+- `DEPLOYMENT_MONITORING_STACK_REPO_BRANCH`
+  - overrides repo branch
+
+#### Cloudflare Utils
+
+Required:
+- `cloudflare_utils_deploy_targets`
+- `cloudflare_utils_repo_deploy_key_private`
+- `cloudflare_utils_git_known_hosts`
+- `cloudflare_utils_infisical_project_id`
+- `cloudflare_utils_infisical_token`
+
+Optional:
+- `DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH`
+  - overrides repo branch
+- `DEPLOYMENT_CLOUDFLARE_UTILS_INFISICAL_SYNC_ENABLED`
+  - defaults to `true`
+  - accepts `1`, `true`, `yes`, `on`
+
+#### Renovate
+
+Required:
+- `renovate_deploy_targets`
+- `renovate_repo_deploy_key_private`
+- `renovate_git_known_hosts`
+- `renovate_infisical_project_id`
+- `renovate_infisical_token`
+
+Optional:
+- `DEPLOYMENT_RENOVATE_REPO_BRANCH`
+  - overrides repo branch
+- `DEPLOYMENT_RENOVATE_INFISICAL_SYNC_ENABLED`
+  - defaults to `true`
+  - accepts `1`, `true`, `yes`, `on`
+
+### What the runtime inputs do
+
+- `*_deploy_targets`
+  - choose which inventory hosts receive the sync/deploy
+- `*_repo_deploy_key_private`
+  - SSH private key used to clone the compose repo
+- `*_git_known_hosts`
+  - pinned Git SSH host keys used for strict host verification
+- `*_infisical_project_id`
+  - Infisical project to export application secrets from
+- `*_infisical_token`
+  - token used by the Infisical CLI during export
+- `DEPLOYMENT_*_REPO_BRANCH`
+  - optional branch override for testing or staged rollouts
+- `DEPLOYMENT_*_INFISICAL_SYNC_ENABLED`
+  - optional runtime toggle for `.env` export behavior on apps that use Infisical
+
+### Manual examples
+
+**Komodo**
+```bash
+ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml \
+  -e komodo_core_deploy_targets=devstack-1 \
+  -e komodo_periphery_deploy_targets=devstack-1 \
+  -e @vars/komodo-secrets.yml
+```
+
+**Renovate**
+```bash
+ansible-playbook -i inventory/hosts.yml playbooks/deploy/renovate.yml \
+  -e renovate_deploy_targets=devstack-1 \
+  -e @vars/renovate-secrets.yml
+```
 
 ## Automated Updates
 
