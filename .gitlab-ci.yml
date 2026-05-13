@@ -464,15 +464,19 @@ ansible-smoke-deploy-renovate:
       import json
       import os
       from pathlib import Path
+      key = os.environ['RENOVATE_REPO_DEPLOY_KEY_PRIVATE'].replace('\r\n', '\n').replace('\r', '\n')
       data = {
           'renovate_deploy_targets': os.environ['RENOVATE_DEPLOY_TARGETS'],
-          'renovate_repo_deploy_key_private': os.environ['RENOVATE_REPO_DEPLOY_KEY_PRIVATE'],
-          'renovate_git_known_hosts': os.environ['RENOVATE_GIT_KNOWN_HOSTS'],
+          'renovate_repo_deploy_key_private': key,
+          'renovate_git_known_hosts': os.environ['RENOVATE_GIT_KNOWN_HOSTS'].replace('\r\n', '\n').replace('\r', '\n'),
           'renovate_infisical_application_sync_enabled': True,
           'renovate_infisical_project_id': os.environ['RENOVATE_INFISICAL_PROJECT_ID'],
           'renovate_infisical_token': os.environ['RENOVATE_INFISICAL_TOKEN'],
       }
       Path('/tmp/renovate-smoke-vars.json').write_text(json.dumps(data))
+      Path('/tmp/renovate_repo_key').write_text(key)
       PY
+    - chmod 600 /tmp/renovate_repo_key
+    - ssh-keygen -y -f /tmp/renovate_repo_key >/dev/null
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/renovate.yml --limit "$RENOVATE_DEPLOY_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/renovate-smoke-vars.json
