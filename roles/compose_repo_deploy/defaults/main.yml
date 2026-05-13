@@ -5,7 +5,8 @@ compose_repo_url: "{{ ((compose_repo_git_base_url ~ '/' ~ compose_app_name ~ '.g
 compose_repo_root: "/etc/komodo/repos"
 compose_repo_name: "{{ (compose_app_name | default('', true)) if (compose_app_name | default('', true) | length > 0) else ((compose_repo_url | basename | regex_replace('\\.git$', '')) if (compose_repo_url | default('') | length > 0) else '') }}"
 compose_repo_dest: "{{ (compose_repo_root ~ '/' ~ compose_repo_name) if (compose_repo_name | default('') | length > 0) else '' }}"
-compose_repo_branch: "master"
+compose_repo_branch_env_var: "{{ ('DEPLOYMENT_' ~ (compose_app_name | upper | replace('-', '_')) ~ '_REPO_BRANCH') if (compose_app_name | default('', true) | length > 0) else '' }}"
+compose_repo_branch: "{{ (lookup('ansible.builtin.env', compose_repo_branch_env_var, default='') | trim) or 'master' }}"
 compose_deploy_script: "./deploy.sh"
 
 compose_repo_ssh_root: "{{ ssh_root | default('', true) }}"

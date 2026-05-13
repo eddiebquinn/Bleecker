@@ -21,7 +21,6 @@
       vars:
         compose_repo_label: "Renovate"
         compose_app_name: "renovate"
-        compose_repo_branch: "{{ lookup('ansible.builtin.env', 'DEPLOYMENT_RENOVATE_REPO_BRANCH', default='master') | trim or 'master' }}"
         compose_repo_deploy_key_private: "{{ renovate_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ renovate_git_known_hosts }}"
         compose_repo_infisical_application_sync_enabled: "{{ renovate_infisical_application_sync_enabled }}"
@@ -29,21 +28,6 @@
         compose_repo_infisical_token: "{{ renovate_infisical_token }}"
       tags: [sync, core]
 
-    - name: Check exported Renovate env file
-      ansible.builtin.stat:
-        path: "{{ compose_repo_root }}/renovate/.env"
-      register: renovate_env_file
-      changed_when: false
-
-    - name: Assert Renovate env file is not empty
-      ansible.builtin.assert:
-        that:
-          - renovate_env_file.stat.exists
-          - (renovate_env_file.stat.size | int) > 0
-        fail_msg: >-
-          Renovate exported .env is missing or empty at {{ compose_repo_root }}/renovate/.env.
-          Check the Infisical path/tags/env for renovate application secrets.
-      changed_when: false
 
 - name: Deploy Renovate to selected docker hosts
   hosts: "{{ renovate_deploy_targets | default('renovate_targets_missing') }}"

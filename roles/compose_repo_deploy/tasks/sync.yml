@@ -146,3 +146,24 @@
       ([ '--tags=' ~ (item.tags | join(',')) ] if (item.tags is defined and (item.tags | length > 0)) else []) }}
   no_log: true
   when: compose_repo_infisical_application_sync_enabled | bool
+
+- name: Check exported compose env files
+  ansible.builtin.stat:
+    path: "{{ compose_repo_dest }}/{{ item.path }}"
+  loop: "{{ compose_repo_env_exports }}"
+  register: compose_repo_exported_env_file_stats
+  changed_when: false
+  when: compose_repo_infisical_application_sync_enabled | bool
+
+- name: Assert exported compose env files are not empty
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - (item.stat.size | int) > 0
+    fail_msg: >-
+      {{ compose_repo_label }} exported env file is missing or empty at
+      {{ item.stat.path | default(compose_repo_dest ~ '/' ~ item.item.path) }}.
+      Check the Infisical path/tags/env settings for this application.
+  loop: "{{ compose_repo_exported_env_file_stats.results | default([]) }}"
+  changed_when: false
+  when: compose_repo_infisical_application_sync_enabled | bool
