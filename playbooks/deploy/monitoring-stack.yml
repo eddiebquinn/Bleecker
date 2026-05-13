@@ -22,12 +22,7 @@
         tasks_from: sync
       vars:
         compose_repo_label: "Monitoring stack"
-        compose_repo_url: "{{ monitoring_repo_url }}"
-        compose_repo_branch: "{{ monitoring_repo_branch }}"
-        compose_deploy_script: "{{ monitoring_deploy_script }}"
-        compose_repo_ssh_dir: "{{ monitoring_repo_ssh_dir }}"
-        compose_repo_ssh_key_path: "{{ monitoring_repo_ssh_key_path }}"
-        compose_repo_known_hosts_path: "{{ monitoring_repo_known_hosts_path }}"
+        compose_app_name: "monitoring-stack"
         compose_repo_deploy_key_private: "{{ monitoring_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ monitoring_git_known_hosts }}"
       tags: [sync, core, exporters]
@@ -54,8 +49,7 @@
         tasks_from: run
       vars:
         compose_repo_label: "Monitoring stack"
-        compose_repo_url: "{{ monitoring_repo_url }}"
-        compose_deploy_script: "{{ monitoring_deploy_script }}"
+        compose_app_name: "monitoring-stack"
         compose_deploy_args:
           - --core
       tags: [core]
@@ -82,8 +76,7 @@
         tasks_from: run
       vars:
         compose_repo_label: "Monitoring stack"
-        compose_repo_url: "{{ monitoring_repo_url }}"
-        compose_deploy_script: "{{ monitoring_deploy_script }}"
+        compose_app_name: "monitoring-stack"
         compose_deploy_args:
           - --exporters
       tags: [exporters]

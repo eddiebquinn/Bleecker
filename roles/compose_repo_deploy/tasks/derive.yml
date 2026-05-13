@@ -1,0 +1,27 @@
+---
+- name: Derive compose repo SSH directory from shared root when not explicitly set
+  ansible.builtin.set_fact:
+    compose_repo_ssh_dir: >-
+      {{
+        compose_repo_ssh_dir
+        if (compose_repo_ssh_dir | default('', true) | length > 0)
+        else ((compose_repo_ssh_root | default('', true)) ~ '/' ~ compose_repo_name)
+      }}
+
+- name: Derive compose repo SSH key path when not explicitly set
+  ansible.builtin.set_fact:
+    compose_repo_ssh_key_path: >-
+      {{
+        compose_repo_ssh_key_path
+        if (compose_repo_ssh_key_path | default('', true) | length > 0)
+        else (compose_repo_ssh_dir ~ '/id_ed25519')
+      }}
+
+- name: Derive compose repo known_hosts path when not explicitly set
+  ansible.builtin.set_fact:
+    compose_repo_known_hosts_path: >-
+      {{
+        compose_repo_known_hosts_path
+        if (compose_repo_known_hosts_path | default('', true) | length > 0)
+        else (compose_repo_ssh_dir ~ '/known_hosts')
+      }}

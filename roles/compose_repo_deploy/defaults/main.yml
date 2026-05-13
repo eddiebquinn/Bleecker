@@ -1,12 +1,15 @@
 ---
 compose_repo_label: "Compose repo"
-compose_repo_url: ""
+compose_repo_git_base_url: "{{ compose_git_base_url | default('', true) }}"
+compose_repo_url: "{{ ((compose_repo_git_base_url ~ '/' ~ compose_app_name ~ '.git') if ((compose_repo_git_base_url | default('', true) | length > 0) and (compose_app_name | default('', true) | length > 0)) else '') }}"
 compose_repo_root: "/etc/komodo/repos"
-compose_repo_name: "{{ (compose_repo_url | basename | regex_replace('\\.git$', '')) if (compose_repo_url | default('') | length > 0) else '' }}"
+compose_repo_name: "{{ (compose_app_name | default('', true)) if (compose_app_name | default('', true) | length > 0) else ((compose_repo_url | basename | regex_replace('\\.git$', '')) if (compose_repo_url | default('') | length > 0) else '') }}"
 compose_repo_dest: "{{ (compose_repo_root ~ '/' ~ compose_repo_name) if (compose_repo_name | default('') | length > 0) else '' }}"
-compose_repo_branch: "master"
+compose_repo_branch_env_var: "{{ ('DEPLOYMENT_' ~ (compose_app_name | upper | replace('-', '_')) ~ '_REPO_BRANCH') if (compose_app_name | default('', true) | length > 0) else '' }}"
+compose_repo_branch: "{{ (lookup('ansible.builtin.env', compose_repo_branch_env_var, default='') | trim) or 'master' }}"
 compose_deploy_script: "./deploy.sh"
 
+compose_repo_ssh_root: "{{ ssh_root | default('', true) }}"
 compose_repo_ssh_dir: ""
 compose_repo_ssh_key_path: ""
 compose_repo_known_hosts_path: ""
@@ -18,7 +21,8 @@ compose_repo_infisical_application_sync_enabled: false
 compose_repo_infisical_project_id: ""
 compose_repo_infisical_env: "prod"
 compose_repo_infisical_token: ""
-compose_repo_infisical_domain: "https://infisical.eddiequinn.casa/api"
-compose_repo_env_exports: []
+compose_repo_infisical_domain: "{{ infisical_domain | default('https://infisical.eddiequinn.casa/api', true) }}"
+compose_repo_infisical_application_path: "{{ ('/' ~ compose_app_name ~ '/application') if (compose_app_name | default('', true) | length > 0) else '' }}"
+compose_repo_env_exports: "{{ ([{'path': '.env', 'path_in_infisical': compose_repo_infisical_application_path}] if (compose_repo_infisical_application_sync_enabled | bool) and (compose_repo_infisical_application_path | default('', true) | length > 0) else []) }}"
 
 compose_deploy_args: []

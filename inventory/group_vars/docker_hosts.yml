@@ -8,51 +8,19 @@ docker_agent_shell: /usr/sbin/nologin
 
 docker_service_name: docker
 
-compose_repo_root: "/etc/komodo/repos"
+deploy_root: "/etc/komodo"
+ssh_root: "{{ deploy_root }}/ssh"
+compose_repo_root: "{{ deploy_root }}/repos"
+compose_git_base_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files"
+infisical_domain: "https://infisical.eddiequinn.casa/api"
 
 # Komodo Vars
-komodo_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/komodo.git"
-komodo_repo_branch: "master"
-komodo_deploy_script: "./deploy.sh"
-
-komodo_repo_ssh_dir: "/etc/komodo/ssh"
-komodo_repo_ssh_key_path: "/etc/komodo/ssh/id_ed25519"
-komodo_repo_known_hosts_path: "/etc/komodo/ssh/known_hosts"
 
 # Monitoring stack vars
-monitoring_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/monitoring-stack.git"
-monitoring_repo_branch: "master"
-monitoring_deploy_script: "./deploy.sh"
-
-monitoring_repo_ssh_dir: "/etc/monitoring-stack/ssh"
-monitoring_repo_ssh_key_path: "/etc/monitoring-stack/ssh/id_ed25519"
-monitoring_repo_known_hosts_path: "/etc/monitoring-stack/ssh/known_hosts"
 
 # Docker package management is enabled so fresh Docker hosts can bootstrap cleanly
 docker_manage_packages: true
 
 # Cloudflare Utils vars
-cloudflare_utils_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/cloudflare-utils.git"
-cloudflare_utils_repo_branch: "master"
-cloudflare_utils_deploy_script: "./deploy.sh"
-
-cloudflare_utils_repo_ssh_dir: "/etc/cloudflare-utils/ssh"
-cloudflare_utils_repo_ssh_key_path: "/etc/cloudflare-utils/ssh/id_ed25519"
-cloudflare_utils_repo_known_hosts_path: "/etc/cloudflare-utils/ssh/known_hosts"
-
-cloudflare_utils_infisical_application_sync_enabled: true
-cloudflare_utils_infisical_env: "prod"
-cloudflare_utils_infisical_domain: "https://infisical.eddiequinn.casa/api"
-cloudflare_utils_infisical_application_path: "/cloudflare-utils/application"
 
 # Renovate vars
-renovate_repo_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/compose-files/renovate.git"
-renovate_repo_branch: "master"
-renovate_deploy_script: "./deploy.sh"
-renovate_repo_ssh_dir: "/etc/renovate/ssh"
-renovate_repo_ssh_key_path: "/etc/renovate/ssh/id_ed25519"
-renovate_repo_known_hosts_path: "/etc/renovate/ssh/known_hosts"
-renovate_infisical_application_sync_enabled: true
-renovate_infisical_env: "prod"
-renovate_infisical_domain: "https://infisical.eddiequinn.casa/api"
-renovate_infisical_application_path: "/renovate/application"
