@@ -461,19 +461,18 @@ ansible-smoke-deploy-renovate:
     - chmod 644 .ansible/known_hosts
     - |
       python3 - <<'PY'
+      import json
       import os
       from pathlib import Path
-      def yaml_quote(value: str) -> str:
-          return "'" + value.replace("'", "''") + "'"
-      lines = [
-          f"renovate_deploy_targets: {yaml_quote(os.environ['RENOVATE_DEPLOY_TARGETS'])}",
-          f"renovate_repo_deploy_key_private: {yaml_quote(os.environ['RENOVATE_REPO_DEPLOY_KEY_PRIVATE'])}",
-          f"renovate_git_known_hosts: {yaml_quote(os.environ['RENOVATE_GIT_KNOWN_HOSTS'])}",
-          f"renovate_infisical_application_sync_enabled: true",
-          f"renovate_infisical_project_id: {yaml_quote(os.environ['RENOVATE_INFISICAL_PROJECT_ID'])}",
-          f"renovate_infisical_token: {yaml_quote(os.environ['RENOVATE_INFISICAL_TOKEN'])}",
-      ]
-      Path('/tmp/renovate-smoke-vars.yml').write_text("\n".join(lines) + "\n")
+      data = {
+          'renovate_deploy_targets': os.environ['RENOVATE_DEPLOY_TARGETS'],
+          'renovate_repo_deploy_key_private': os.environ['RENOVATE_REPO_DEPLOY_KEY_PRIVATE'],
+          'renovate_git_known_hosts': os.environ['RENOVATE_GIT_KNOWN_HOSTS'],
+          'renovate_infisical_application_sync_enabled': True,
+          'renovate_infisical_project_id': os.environ['RENOVATE_INFISICAL_PROJECT_ID'],
+          'renovate_infisical_token': os.environ['RENOVATE_INFISICAL_TOKEN'],
+      }
+      Path('/tmp/renovate-smoke-vars.json').write_text(json.dumps(data))
       PY
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/renovate.yml --limit "$RENOVATE_DEPLOY_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/renovate-smoke-vars.yml
+    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/renovate.yml --limit "$RENOVATE_DEPLOY_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/renovate-smoke-vars.json
