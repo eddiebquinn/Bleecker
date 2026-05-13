@@ -22,7 +22,5 @@ infisical_domain: "https://infisical.eddiequinn.casa/api"
 docker_manage_packages: true
 
 # Cloudflare Utils vars
-cloudflare_utils_infisical_application_sync_enabled: true
 
 # Renovate vars
-renovate_infisical_application_sync_enabled: true

@@ -23,7 +23,8 @@
         compose_app_name: "renovate"
         compose_repo_deploy_key_private: "{{ renovate_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ renovate_git_known_hosts }}"
-        compose_repo_infisical_application_sync_enabled: "{{ renovate_infisical_application_sync_enabled }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_RENOVATE_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
         compose_repo_infisical_project_id: "{{ renovate_infisical_project_id }}"
         compose_repo_infisical_token: "{{ renovate_infisical_token }}"
       tags: [sync, core]
