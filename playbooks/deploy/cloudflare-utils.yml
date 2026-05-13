@@ -20,25 +20,18 @@
         tasks_from: sync
       vars:
         compose_repo_label: "Cloudflare Utils"
-        compose_repo_url: "{{ cloudflare_utils_repo_url }}"
         compose_app_name: "cloudflare-utils"
-        compose_repo_branch: "{{ (lookup('ansible.builtin.env', 'DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH', default='') | trim) or cloudflare_utils_repo_branch }}"
-        compose_deploy_script: "{{ cloudflare_utils_deploy_script }}"
+        compose_repo_branch: "{{ lookup('ansible.builtin.env', 'DEPLOYMENT_CLOUDFLARE_UTILS_REPO_BRANCH', default='master') | trim or 'master' }}"
         compose_repo_deploy_key_private: "{{ cloudflare_utils_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ cloudflare_utils_git_known_hosts }}"
         compose_repo_infisical_application_sync_enabled: "{{ cloudflare_utils_infisical_application_sync_enabled }}"
         compose_repo_infisical_project_id: "{{ cloudflare_utils_infisical_project_id }}"
-        compose_repo_infisical_env: "{{ cloudflare_utils_infisical_env }}"
         compose_repo_infisical_token: "{{ cloudflare_utils_infisical_token }}"
-        compose_repo_infisical_domain: "{{ cloudflare_utils_infisical_domain }}"
-        compose_repo_env_exports:
-          - path: ".env"
-            path_in_infisical: "{{ cloudflare_utils_infisical_application_path }}"
       tags: [sync, core]
 
     - name: Check exported Cloudflare Utils env file
       ansible.builtin.stat:
-        path: "{{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\\.git$', '') }}/.env"
+        path: "{{ compose_repo_root }}/cloudflare-utils/.env"
       register: cloudflare_utils_env_file
       changed_when: false
 
@@ -48,7 +41,7 @@
           - cloudflare_utils_env_file.stat.exists
           - (cloudflare_utils_env_file.stat.size | int) > 0
         fail_msg: >-
-          Cloudflare Utils exported .env is missing or empty at {{ compose_repo_root }}/{{ cloudflare_utils_repo_url | basename | regex_replace('\\.git$', '') }}/.env.
+          Cloudflare Utils exported .env is missing or empty at {{ compose_repo_root }}/cloudflare-utils/.env.
           Check the Infisical path/tags/env for cloudflare-utils application secrets.
       changed_when: false
 
@@ -74,7 +67,5 @@
         tasks_from: run
       vars:
         compose_repo_label: "Cloudflare Utils"
-        compose_repo_url: "{{ cloudflare_utils_repo_url }}"
         compose_app_name: "cloudflare-utils"
-        compose_deploy_script: "{{ cloudflare_utils_deploy_script }}"
       tags: [core]
