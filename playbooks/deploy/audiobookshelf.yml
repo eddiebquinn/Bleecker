@@ -1,0 +1,51 @@
+---
+- name: Sync Audiobookshelf repo to selected docker hosts
+  hosts: "{{ audiobookshelf_deploy_targets | default('audiobookshelf_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert Audiobookshelf deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - audiobookshelf_deploy_targets is defined
+          - audiobookshelf_deploy_targets | length > 0
+        fail_msg: >-
+          Audiobookshelf deploy requires audiobookshelf_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync Audiobookshelf repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Audiobookshelf"
+        compose_app_name: "audiobookshelf"
+        compose_repo_deploy_key_private: "{{ audiobookshelf_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ audiobookshelf_git_known_hosts }}"
+      tags: [sync, core]
+
+- name: Deploy Audiobookshelf to selected docker hosts
+  hosts: "{{ audiobookshelf_deploy_targets | default('audiobookshelf_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Audiobookshelf deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - audiobookshelf_deploy_targets is defined
+          - audiobookshelf_deploy_targets | length > 0
+        fail_msg: >-
+          Audiobookshelf deploy requires audiobookshelf_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run Audiobookshelf deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Audiobookshelf"
+        compose_app_name: "audiobookshelf"
+      tags: [core]
