@@ -1,0 +1,51 @@
+---
+- name: Sync Commafeed repo to selected docker hosts
+  hosts: "{{ commafeed_deploy_targets | default('commafeed_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert Commafeed deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - commafeed_deploy_targets is defined
+          - commafeed_deploy_targets | length > 0
+        fail_msg: >-
+          Commafeed deploy requires commafeed_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync Commafeed repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Commafeed"
+        compose_app_name: "commafeed"
+        compose_repo_deploy_key_private: "{{ commafeed_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ commafeed_git_known_hosts }}"
+      tags: [sync, core]
+
+- name: Deploy Commafeed to selected docker hosts
+  hosts: "{{ commafeed_deploy_targets | default('commafeed_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Commafeed deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - commafeed_deploy_targets is defined
+          - commafeed_deploy_targets | length > 0
+        fail_msg: >-
+          Commafeed deploy requires commafeed_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run Commafeed deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Commafeed"
+        compose_app_name: "commafeed"
+      tags: [core]
