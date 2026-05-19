@@ -24,9 +24,9 @@
         compose_repo_deploy_key_private: "{{ homepage_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ homepage_git_known_hosts }}"
         compose_repo_infisical_application_sync_enabled: >-
-          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_HOMEPAGE_UTILS_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
-        compose_repo_infisical_project_id: "{{ homepage_utils_infisical_project_id }}"
-        compose_repo_infisical_token: "{{ homepage_utils_infisical_token }}"
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_HOMEPAGE_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ homepage_infisical_project_id }}"
+        compose_repo_infisical_token: "{{ homepage_infisical_token }}"
       tags: [sync, core]
 
 - name: Deploy Homepage to selected docker hosts
