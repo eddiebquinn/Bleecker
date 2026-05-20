@@ -31,3 +31,6 @@ docker_conflicting_packages_common:
   - runc
 docker_conflicting_packages_ubuntu:
   - docker-compose-v2
+
+docker_registry_auth_enabled: false
+docker_registry_auth_entries: []

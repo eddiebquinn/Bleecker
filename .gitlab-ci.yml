@@ -192,13 +192,22 @@ ansible-dry-run-lifecycle:
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)'
+    - |
+      if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
+        test -n "${DOCKER_REGISTRY_AUTH_REGISTRY:-}" || (echo "DOCKER_REGISTRY_AUTH_REGISTRY is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        test -n "${DOCKER_REGISTRY_AUTH_USERNAME:-}" || (echo "DOCKER_REGISTRY_AUTH_USERNAME is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        test -n "${DOCKER_REGISTRY_AUTH_PASSWORD:-}" || (echo "DOCKER_REGISTRY_AUTH_PASSWORD is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        python3 -c 'import json, os, pathlib; pathlib.Path("/tmp/docker-registry-auth-vars.json").write_text(json.dumps({"docker_registry_auth_enabled": True, "docker_registry_auth_entries": [{"registry": os.environ["DOCKER_REGISTRY_AUTH_REGISTRY"], "username": os.environ["DOCKER_REGISTRY_AUTH_USERNAME"], "password": os.environ["DOCKER_REGISTRY_AUTH_PASSWORD"]}]}, indent=2))'
+      else
+        printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
+      fi
   script:
     - |
       if [ -z "$RESOLVED_TARGETS" ]; then
         echo "No provisioned hosts selected, skipping lifecycle dry-run"
         exit 0
       fi
-    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
 
 ansible-provision-hosts:
   <<: *default_ansible_job
@@ -359,8 +368,17 @@ ansible-apply-lifecycle:
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for LIFECYCLE_TARGETS=$LIFECYCLE_TARGETS" && exit 1)
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
+    - |
+      if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
+        test -n "${DOCKER_REGISTRY_AUTH_REGISTRY:-}" || (echo "DOCKER_REGISTRY_AUTH_REGISTRY is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        test -n "${DOCKER_REGISTRY_AUTH_USERNAME:-}" || (echo "DOCKER_REGISTRY_AUTH_USERNAME is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        test -n "${DOCKER_REGISTRY_AUTH_PASSWORD:-}" || (echo "DOCKER_REGISTRY_AUTH_PASSWORD is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
+        python3 -c 'import json, os, pathlib; pathlib.Path("/tmp/docker-registry-auth-vars.json").write_text(json.dumps({"docker_registry_auth_enabled": True, "docker_registry_auth_entries": [{"registry": os.environ["DOCKER_REGISTRY_AUTH_REGISTRY"], "username": os.environ["DOCKER_REGISTRY_AUTH_USERNAME"], "password": os.environ["DOCKER_REGISTRY_AUTH_PASSWORD"]}]}, indent=2))'
+      else
+        printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
+      fi
   script:
-    - ansible-playbook -i inventory/hosts.yml site.yml --limit "$LIFECYCLE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+    - ansible-playbook -i inventory/hosts.yml site.yml --limit "$LIFECYCLE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
 
 ansible-apply-updates:
   <<: *default_ssh_ansible_job
