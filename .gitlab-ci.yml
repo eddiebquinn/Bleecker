@@ -198,18 +198,18 @@ ansible-dry-run-lifecycle:
         test -n "${DOCKER_REGISTRY_AUTH_USERNAME:-}" || (echo "DOCKER_REGISTRY_AUTH_USERNAME is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
         test -n "${DOCKER_REGISTRY_AUTH_PASSWORD:-}" || (echo "DOCKER_REGISTRY_AUTH_PASSWORD is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
         python3 - <<'PYV'
-from pathlib import Path
-import os
-def yaml_quote(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
-Path('/tmp/docker-registry-auth-vars.yml').write_text(
-    "docker_registry_auth_enabled: true\n"
-    "docker_registry_auth_entries:\n"
-    f"  - registry: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_REGISTRY'])}\n"
-    f"    username: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_USERNAME'])}\n"
-    f"    password: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_PASSWORD'])}\n"
-)
-PYV
+        from pathlib import Path
+        import os
+        def yaml_quote(value: str) -> str:
+            return "'" + value.replace("'", "''") + "'"
+        Path('/tmp/docker-registry-auth-vars.yml').write_text(
+            "docker_registry_auth_enabled: true\n"
+            "docker_registry_auth_entries:\n"
+            f"  - registry: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_REGISTRY'])}\n"
+            f"    username: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_USERNAME'])}\n"
+            f"    password: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_PASSWORD'])}\n"
+        )
+        PYV
       else
         printf '%s\n' 'docker_registry_auth_enabled: false' > /tmp/docker-registry-auth-vars.yml
       fi
@@ -386,18 +386,18 @@ ansible-apply-lifecycle:
         test -n "${DOCKER_REGISTRY_AUTH_USERNAME:-}" || (echo "DOCKER_REGISTRY_AUTH_USERNAME is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
         test -n "${DOCKER_REGISTRY_AUTH_PASSWORD:-}" || (echo "DOCKER_REGISTRY_AUTH_PASSWORD is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
         python3 - <<'PYV'
-from pathlib import Path
-import os
-def yaml_quote(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
-Path('/tmp/docker-registry-auth-vars.yml').write_text(
-    "docker_registry_auth_enabled: true\n"
-    "docker_registry_auth_entries:\n"
-    f"  - registry: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_REGISTRY'])}\n"
-    f"    username: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_USERNAME'])}\n"
-    f"    password: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_PASSWORD'])}\n"
-)
-PYV
+        from pathlib import Path
+        import os
+        def yaml_quote(value: str) -> str:
+            return "'" + value.replace("'", "''") + "'"
+        Path('/tmp/docker-registry-auth-vars.yml').write_text(
+            "docker_registry_auth_enabled: true\n"
+            "docker_registry_auth_entries:\n"
+            f"  - registry: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_REGISTRY'])}\n"
+            f"    username: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_USERNAME'])}\n"
+            f"    password: {yaml_quote(os.environ['DOCKER_REGISTRY_AUTH_PASSWORD'])}\n"
+        )
+        PYV
       else
         printf '%s\n' 'docker_registry_auth_enabled: false' > /tmp/docker-registry-auth-vars.yml
       fi
