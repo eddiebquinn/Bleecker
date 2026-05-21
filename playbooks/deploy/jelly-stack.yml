@@ -20,7 +20,7 @@
         tasks_from: sync
       vars:
         compose_repo_label: "Jelly Stack"
-        compose_app_name: "jelly_stack"
+        compose_app_name: "jelly-stack"
         compose_repo_deploy_key_private: "{{ jelly_stack_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ jelly_stack_git_known_hosts }}"
       tags: [sync, core]
@@ -47,5 +47,5 @@
         tasks_from: run
       vars:
         compose_repo_label: "Jelly Stack"
-        compose_app_name: "jelly_stack"
+        compose_app_name: "jelly-stack"
       tags: [core]
