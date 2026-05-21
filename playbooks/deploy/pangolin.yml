@@ -1,0 +1,58 @@
+---
+- name: Sync Pangolin repo to selected docker hosts
+  hosts: "{{ pangolin_deploy_targets | default('pangolin_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert Pangolin deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - pangolin_deploy_targets is defined
+          - pangolin_deploy_targets | length > 0
+        fail_msg: >-
+          Pangolin deploy requires pangolin_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync Pangolin repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Pangolin"
+        compose_app_name: "pangolin"
+        compose_repo_deploy_key_private: "{{ pangolin_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ pangolin_git_known_hosts }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_PANGOLIN_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ pangolin_infisical_project_id }}"
+        compose_repo_infisical_token: "{{ pangolin_infisical_token }}"
+        # Pangolin needs multiple repo-local env files, so callers must pass an
+        # explicit export map instead of relying on the generic single-.env default.
+        compose_repo_env_exports: "{{ pangolin_repo_env_exports | default([], true) }}"
+      tags: [sync, core]
+
+- name: Deploy Pangolin to selected docker hosts
+  hosts: "{{ pangolin_deploy_targets | default('pangolin_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Pangolin deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - pangolin_deploy_targets is defined
+          - pangolin_deploy_targets | length > 0
+        fail_msg: >-
+          Pangolin deploy requires pangolin_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run Pangolin deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Pangolin"
+        compose_app_name: "pangolin"
+      tags: [core]

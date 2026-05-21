@@ -345,6 +345,7 @@ Current playbooks:
 - `playbooks/deploy/monitoring-stack.yml`
 - `playbooks/deploy/cloudflare-utils.yml`
 - `playbooks/deploy/renovate.yml`
+- `playbooks/deploy/pangolin.yml`
 
 These playbooks now follow a more generic contract:
 - shared path conventions come from inventory (`deploy_root`, `ssh_root`, `compose_repo_root`)
@@ -372,6 +373,7 @@ These values are now shared and do not usually need per-app variables:
   - defaults to `/<app-name>/application`
 - `compose_repo_env_exports`
   - defaults to exporting `.env` when Infisical sync is enabled
+  - can be overridden per app when a repo needs multiple env files or subdirectory-specific exports
 
 ### Required runtime inputs by deploy playbook
 
@@ -393,6 +395,8 @@ These should normally come from CI/CD variables or manual `-e` inputs rather tha
   - optional branch override for testing or staged rollouts
 - `DEPLOYMENT_*_INFISICAL_SYNC_ENABLED`
   - optional runtime toggle for `.env` export behavior on apps that use Infisical
+- `*_repo_env_exports`
+  - optional per-app list of repo-relative env exports for stacks that need multiple files or tag-scoped Infisical exports
 
 ### Manual examples
 
