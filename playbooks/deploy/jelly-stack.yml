@@ -1,0 +1,51 @@
+---
+- name: Sync Jelly Stack repo to selected docker hosts
+  hosts: "{{ jelly_stack_deploy_targets | default('jelly_stack_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert Jelly Stack deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - jelly_stack_deploy_targets is defined
+          - jelly_stack_deploy_targets | length > 0
+        fail_msg: >-
+          Jelly Stack deploy requires jelly_stack_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync Jelly Stack repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Jelly Stack"
+        compose_app_name: "jelly_stack"
+        compose_repo_deploy_key_private: "{{ jelly_stack_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ jelly_stack_git_known_hosts }}"
+      tags: [sync, core]
+
+- name: Deploy Jelly Stack to selected docker hosts
+  hosts: "{{ jelly_stack_deploy_targets | default('jelly_stack_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Jelly Stack deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - jelly_stack_deploy_targets is defined
+          - jelly_stack_deploy_targets | length > 0
+        fail_msg: >-
+          Jelly Stack deploy requires jelly_stack_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run Jelly Stack deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Jelly Stack"
+        compose_app_name: "jelly_stack"
+      tags: [core]
