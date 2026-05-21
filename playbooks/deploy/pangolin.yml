@@ -29,7 +29,17 @@
         compose_repo_infisical_token: "{{ pangolin_infisical_token }}"
         # Pangolin needs multiple repo-local env files, so callers must pass an
         # explicit export map instead of relying on the generic single-.env default.
-        compose_repo_env_exports: "{{ pangolin_repo_env_exports | default([], true) }}"
+        compose_repo_env_exports: >-
+          {{
+            pangolin_repo_env_exports
+            | default(
+                (
+                  (pangolin_repo_env_exports_json | default('', true) | trim) | length > 0
+                )
+                | ternary((pangolin_repo_env_exports_json | from_yaml), []),
+                true
+              )
+          }}
       tags: [sync, core]
 
 - name: Deploy Pangolin to selected docker hosts
