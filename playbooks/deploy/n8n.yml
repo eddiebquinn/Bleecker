@@ -1,0 +1,55 @@
+---
+- name: Sync N8N repo to selected docker hosts
+  hosts: "{{ n8n_deploy_targets | default('n8n_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert N8N deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - n8n_deploy_targets is defined
+          - n8n_deploy_targets | length > 0
+        fail_msg: >-
+          N8N deploy requires n8n_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync N8N repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "N8N"
+        compose_app_name: "n8n"
+        compose_repo_deploy_key_private: "{{ n8n_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ n8n_git_known_hosts }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_N8N_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ n8n_infisical_project_id }}"
+        compose_repo_infisical_token: "{{ n8n_infisical_token }}"
+      tags: [sync, core]
+
+- name: Deploy N8N to selected docker hosts
+  hosts: "{{ n8n_deploy_targets | default('n8n_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert N8N deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - n8n_deploy_targets is defined
+          - n8n_deploy_targets | length > 0
+        fail_msg: >-
+          N8N deploy requires n8n_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run N8N deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "N8N"
+        compose_app_name: "n8n"
+      tags: [core]
