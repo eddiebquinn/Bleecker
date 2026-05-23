@@ -9,6 +9,8 @@ include:
 stages:
   - scan
   - validate
+  - discover
+  - test
   - apply
 
 variables:
@@ -90,7 +92,7 @@ ansible-validate:
 ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
   <<: *rules_detect
-  stage: validate
+  stage: discover
   needs:
     - job: ansible-validate
   artifacts:
@@ -144,7 +146,7 @@ ansible-detect-provision-state:
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
   <<: *rules_validate
-  stage: validate
+  stage: test
   needs:
     - job: ansible-detect-provision-state
       artifacts: true
