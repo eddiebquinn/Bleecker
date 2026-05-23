@@ -48,28 +48,30 @@ variables:
 
 .rules_detect: &rules_detect
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: on_success
     - when: never
 
+.rules_test: &rules_test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: never
+    - when: never
+
 .rules_update: &rules_update
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
 
 .rules_manual_apply: &rules_manual_apply
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
@@ -145,7 +147,7 @@ ansible-detect-provision-state:
 
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
-  <<: *rules_validate
+  <<: *rules_test
   stage: test
   needs:
     - job: ansible-detect-provision-state
