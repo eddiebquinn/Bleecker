@@ -1,4 +1,13 @@
+include:
+  - project: foundry/meditek
+    ref: master
+    file: /templates/security.yml
+  - project: foundry/meditek
+    ref: master
+    file: /templates/validate.yml
+
 stages:
+  - scan
   - validate
   - apply
 
