@@ -64,7 +64,23 @@
         update_cache: true
         dpkg_options: force-confdef,force-confold
       register: dist_upgrade_result
+      ignore_unreachable: true
       when: ansible_facts.os_family == "Debian"
+
+    - name: Wait for host to return after upgrade disconnect
+      ansible.builtin.wait_for_connection:
+        delay: 10
+        sleep: 10
+        timeout: 900
+      when:
+        - ansible_facts.os_family == "Debian"
+        - dist_upgrade_result.unreachable | default(false)
+
+    - name: Refresh facts after upgrade reconnect
+      ansible.builtin.setup:
+      when:
+        - ansible_facts.os_family == "Debian"
+        - dist_upgrade_result.unreachable | default(false)
 
     - name: Capture dist-upgrade completion timestamp
       ansible.builtin.command:
@@ -82,6 +98,7 @@
           - "dist_upgrade_started_epoch={{ dist_upgrade_started_epoch.stdout }}"
           - "dist_upgrade_finished_epoch={{ dist_upgrade_finished_epoch.stdout }}"
           - "dist_upgrade_elapsed_seconds={{ (dist_upgrade_finished_epoch.stdout | int) - (dist_upgrade_started_epoch.stdout | int) }}"
+          - "dist_upgrade_unreachable={{ dist_upgrade_result.unreachable | default(false) }}"
           - "dist_upgrade_changed={{ dist_upgrade_result.changed | default('unknown') }}"
           - "dist_upgrade_cache_updated={{ dist_upgrade_result.cache_updated | default('unknown') }}"
           - "dist_upgrade_cache_update_time={{ dist_upgrade_result.cache_update_time | default('unknown') }}"
