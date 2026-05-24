@@ -1,7 +1,6 @@
 ---
 - name: Upgrade Debian/Ubuntu hosts and reboot if required
   hosts: all:!core_infra
-  serial: 1
   gather_facts: true
   become: true
 
