@@ -9,39 +9,6 @@
     NEEDRESTART_MODE: a
 
   tasks:
-    - name: Log upgrade context
-      ansible.builtin.debug:
-        msg:
-          - "inventory_hostname={{ inventory_hostname }}"
-          - "ansible_host={{ ansible_host | default(inventory_hostname) }}"
-          - "distribution={{ ansible_facts.distribution | default('unknown') }} {{ ansible_facts.distribution_version | default('unknown') }}"
-          - "kernel={{ ansible_facts.kernel | default('unknown') }}"
-          - "uptime_seconds={{ ansible_facts.uptime_seconds | default('unknown') }}"
-          - "virtualization_role={{ ansible_facts.virtualization_role | default('unknown') }}"
-          - "virtualization_type={{ ansible_facts.virtualization_type | default('unknown') }}"
-
-    - name: Gather Debian upgrade preflight diagnostics
-      ansible.builtin.shell: |
-        set -eu
-        echo "timestamp=$(date -Is)"
-        echo "--- apt/dpkg/unattended processes ---"
-        ps -eo pid,ppid,stat,etime,cmd | grep -E '[a]pt|[d]pkg|[u]nattended' || true
-        echo "--- apt/dpkg lock files ---"
-        for path in \
-          /var/lib/dpkg/lock-frontend \
-          /var/lib/dpkg/lock \
-          /var/cache/apt/archives/lock \
-          /var/lib/apt/lists/lock
-        do
-          ls -l "$path" 2>/dev/null || true
-        done
-        echo "--- reboot-required markers ---"
-        ls -l /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null || true
-      args:
-        executable: /bin/bash
-      changed_when: false
-      when: ansible_facts.os_family == "Debian"
-
     - name: Capture dist-upgrade start timestamp
       ansible.builtin.command:
         argv:
@@ -53,9 +20,7 @@
 
     - name: Log dist-upgrade start timestamp
       ansible.builtin.debug:
-        msg:
-          - "inventory_hostname={{ inventory_hostname }}"
-          - "dist_upgrade_started_epoch={{ dist_upgrade_started_epoch.stdout }}"
+        msg: "dist-upgrade start inventory_hostname={{ inventory_hostname }} epoch={{ dist_upgrade_started_epoch.stdout }}"
       when: ansible_facts.os_family == "Debian"
 
     - name: Perform dist-upgrade (Debian)
@@ -95,15 +60,10 @@
       ansible.builtin.debug:
         msg:
           - "inventory_hostname={{ inventory_hostname }}"
-          - "dist_upgrade_started_epoch={{ dist_upgrade_started_epoch.stdout }}"
-          - "dist_upgrade_finished_epoch={{ dist_upgrade_finished_epoch.stdout }}"
           - "dist_upgrade_elapsed_seconds={{ (dist_upgrade_finished_epoch.stdout | int) - (dist_upgrade_started_epoch.stdout | int) }}"
           - "dist_upgrade_unreachable={{ dist_upgrade_result.unreachable | default(false) }}"
           - "dist_upgrade_changed={{ dist_upgrade_result.changed | default('unknown') }}"
           - "dist_upgrade_cache_updated={{ dist_upgrade_result.cache_updated | default('unknown') }}"
-          - "dist_upgrade_cache_update_time={{ dist_upgrade_result.cache_update_time | default('unknown') }}"
-          - "dist_upgrade_stdout={{ dist_upgrade_result.stdout | default('') }}"
-          - "dist_upgrade_stderr={{ dist_upgrade_result.stderr | default('') }}"
       when: ansible_facts.os_family == "Debian"
 
     - name: Check if a reboot is required (Debian)
