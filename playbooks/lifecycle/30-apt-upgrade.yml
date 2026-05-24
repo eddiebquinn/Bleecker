@@ -1,6 +1,7 @@
 ---
 - name: Upgrade Debian/Ubuntu hosts and reboot if required
   hosts: all:!core_infra
+  serial: 1
   gather_facts: true
   become: true
 
@@ -42,6 +43,22 @@
       changed_when: false
       when: ansible_facts.os_family == "Debian"
 
+    - name: Capture dist-upgrade start timestamp
+      ansible.builtin.command:
+        argv:
+          - date
+          - +%s
+      register: dist_upgrade_started_epoch
+      changed_when: false
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Log dist-upgrade start timestamp
+      ansible.builtin.debug:
+        msg:
+          - "inventory_hostname={{ inventory_hostname }}"
+          - "dist_upgrade_started_epoch={{ dist_upgrade_started_epoch.stdout }}"
+      when: ansible_facts.os_family == "Debian"
+
     - name: Perform dist-upgrade (Debian)
       ansible.builtin.apt:
         upgrade: dist
@@ -50,9 +67,27 @@
       register: dist_upgrade_result
       when: ansible_facts.os_family == "Debian"
 
+    - name: Capture dist-upgrade completion timestamp
+      ansible.builtin.command:
+        argv:
+          - date
+          - +%s
+      register: dist_upgrade_finished_epoch
+      changed_when: false
+      when: ansible_facts.os_family == "Debian"
+
     - name: Log dist-upgrade result summary
       ansible.builtin.debug:
-        var: dist_upgrade_result
+        msg:
+          - "inventory_hostname={{ inventory_hostname }}"
+          - "dist_upgrade_started_epoch={{ dist_upgrade_started_epoch.stdout }}"
+          - "dist_upgrade_finished_epoch={{ dist_upgrade_finished_epoch.stdout }}"
+          - "dist_upgrade_elapsed_seconds={{ (dist_upgrade_finished_epoch.stdout | int) - (dist_upgrade_started_epoch.stdout | int) }}"
+          - "dist_upgrade_changed={{ dist_upgrade_result.changed | default('unknown') }}"
+          - "dist_upgrade_cache_updated={{ dist_upgrade_result.cache_updated | default('unknown') }}"
+          - "dist_upgrade_cache_update_time={{ dist_upgrade_result.cache_update_time | default('unknown') }}"
+          - "dist_upgrade_stdout={{ dist_upgrade_result.stdout | default('') }}"
+          - "dist_upgrade_stderr={{ dist_upgrade_result.stderr | default('') }}"
       when: ansible_facts.os_family == "Debian"
 
     - name: Check if a reboot is required (Debian)
