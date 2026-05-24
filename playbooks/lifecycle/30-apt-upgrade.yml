@@ -9,11 +9,50 @@
     NEEDRESTART_MODE: a
 
   tasks:
+    - name: Log upgrade context
+      ansible.builtin.debug:
+        msg:
+          - "inventory_hostname={{ inventory_hostname }}"
+          - "ansible_host={{ ansible_host | default(inventory_hostname) }}"
+          - "distribution={{ ansible_facts.distribution | default('unknown') }} {{ ansible_facts.distribution_version | default('unknown') }}"
+          - "kernel={{ ansible_facts.kernel | default('unknown') }}"
+          - "uptime_seconds={{ ansible_facts.uptime_seconds | default('unknown') }}"
+          - "virtualization_role={{ ansible_facts.virtualization_role | default('unknown') }}"
+          - "virtualization_type={{ ansible_facts.virtualization_type | default('unknown') }}"
+
+    - name: Gather Debian upgrade preflight diagnostics
+      ansible.builtin.shell: |
+        set -eu
+        echo "timestamp=$(date -Is)"
+        echo "--- apt/dpkg/unattended processes ---"
+        ps -eo pid,ppid,stat,etime,cmd | grep -E '[a]pt|[d]pkg|[u]nattended' || true
+        echo "--- apt/dpkg lock files ---"
+        for path in \
+          /var/lib/dpkg/lock-frontend \
+          /var/lib/dpkg/lock \
+          /var/cache/apt/archives/lock \
+          /var/lib/apt/lists/lock
+        do
+          ls -l "$path" 2>/dev/null || true
+        done
+        echo "--- reboot-required markers ---"
+        ls -l /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: ansible_facts.os_family == "Debian"
+
     - name: Perform dist-upgrade (Debian)
       ansible.builtin.apt:
         upgrade: dist
         update_cache: true
         dpkg_options: force-confdef,force-confold
+      register: dist_upgrade_result
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Log dist-upgrade result summary
+      ansible.builtin.debug:
+        var: dist_upgrade_result
       when: ansible_facts.os_family == "Debian"
 
     - name: Check if a reboot is required (Debian)
@@ -22,6 +61,25 @@
         get_checksum: false
       register: reboot_required_file
       when: ansible_facts.os_family == "Debian"
+
+    - name: Log reboot-required packages
+      ansible.builtin.command:
+        argv:
+          - cat
+          - /var/run/reboot-required.pkgs
+      register: reboot_required_packages
+      changed_when: false
+      failed_when: false
+      when:
+        - ansible_facts.os_family == "Debian"
+        - reboot_required_file.stat.exists
+
+    - name: Show reboot-required packages
+      ansible.builtin.debug:
+        var: reboot_required_packages.stdout_lines
+      when:
+        - ansible_facts.os_family == "Debian"
+        - reboot_required_file.stat.exists
 
     - name: Reboot the server if required (Debian)
       ansible.builtin.reboot:

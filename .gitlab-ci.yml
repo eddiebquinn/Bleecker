@@ -420,7 +420,12 @@ ansible-apply-updates:
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+    - printf 'UPDATE_TARGETS=%s\n' "$UPDATE_TARGETS"
+    - printf 'Resolved target names:\n'
+    - cat /tmp/ansible_target_names.txt
+    - printf 'Resolved ansible_host values:\n'
+    - cat /tmp/ansible_hosts.txt
+    - ANSIBLE_FORCE_COLOR=1 PY_COLORS=1 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -vvv
 
 ansible-smoke-deploy-renovate:
   <<: *default_ssh_ansible_job
