@@ -43,7 +43,7 @@ variables:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: never
+      when: on_success
     - when: never
 
 .rules_detect: &rules_detect
@@ -61,7 +61,7 @@ variables:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: never
+      when: on_success
     - when: never
 
 .rules_update: &rules_update
