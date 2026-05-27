@@ -1,5 +1,16 @@
+include:
+  - project: foundry/meditek
+    ref: master
+    file: /templates/security.yml
+  - project: foundry/meditek
+    ref: master
+    file: /templates/validate.yml
+
 stages:
+  - scan
   - validate
+  - discover
+  - test
   - apply
 
 variables:
@@ -32,10 +43,18 @@ variables:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: never
+      when: on_success
     - when: never
 
 .rules_detect: &rules_detect
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    - when: never
+
+.rules_test: &rules_test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
@@ -49,16 +68,12 @@ variables:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
 
 .rules_manual_apply: &rules_manual_apply
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
     - when: never
@@ -76,11 +91,12 @@ ansible-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/monitoring-stack.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/deploy/cloudflare-utils.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/pangolin.yml --syntax-check
 
 ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
   <<: *rules_detect
-  stage: validate
+  stage: discover
   needs:
     - job: ansible-validate
   artifacts:
@@ -133,16 +149,12 @@ ansible-detect-provision-state:
 
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
-  <<: *rules_validate
-  stage: validate
-  needs:
-    - job: ansible-detect-provision-state
-      artifacts: true
+  <<: *rules_test
+  stage: test
   before_script:
     - test -n "$TARGET_HOSTS" || (echo "TARGET_HOSTS is required" && exit 1)
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
-    - test -f detect/provisioned_hosts.txt || (echo "Detection artifact detect/provisioned_hosts.txt is missing" && exit 1)
     - mkdir -p ~/.ssh .ansible
     - chmod 700 ~/.ssh
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
@@ -150,24 +162,11 @@ ansible-dry-run-lifecycle:
     - ansible -i inventory/hosts.yml "$TARGET_HOSTS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
     - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
     - |
-      python3 - <<'PY'
-      from pathlib import Path
-      targets = [line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()]
-      provisioned = {line.strip() for line in Path('detect/provisioned_hosts.txt').read_text().splitlines() if line.strip()}
-      selected = [host for host in targets if host in provisioned]
-      Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
-      PY
-    - |
-      if [ ! -s /tmp/ansible_selected_target_names.txt ]; then
-        echo "No provisioned hosts matched TARGET_HOSTS=$TARGET_HOSTS, skipping lifecycle dry-run"
-        exit 0
-      fi
-    - |
       python3 - <<'PY' > /tmp/ansible_hosts.txt
       import yaml
       from pathlib import Path
       data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
-      targets = {line.strip() for line in Path('/tmp/ansible_selected_target_names.txt').read_text().splitlines() if line.strip()}
+      targets = {line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()}
       hosts = []
       all_hosts = data.get('all', {})
       def walk_children(node):
@@ -188,10 +187,10 @@ ansible-dry-run-lifecycle:
       for host in hosts:
           print(host)
       PY
-    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected dry-run targets" && exit 1)
+    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
-    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)'
+    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
     - |
       if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
         test -n "${DOCKER_REGISTRY_AUTH_REGISTRY:-}" || (echo "DOCKER_REGISTRY_AUTH_REGISTRY is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
@@ -202,11 +201,6 @@ ansible-dry-run-lifecycle:
         printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
       fi
   script:
-    - |
-      if [ -z "$RESOLVED_TARGETS" ]; then
-        echo "No provisioned hosts selected, skipping lifecycle dry-run"
-        exit 0
-      fi
     - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
 
 ansible-provision-hosts:
@@ -426,7 +420,12 @@ ansible-apply-updates:
     - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
     - chmod 644 .ansible/known_hosts
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key
+    - printf 'UPDATE_TARGETS=%s\n' "$UPDATE_TARGETS"
+    - printf 'Resolved target names:\n'
+    - cat /tmp/ansible_target_names.txt
+    - printf 'Resolved ansible_host values:\n'
+    - cat /tmp/ansible_hosts.txt
+    - ANSIBLE_FORCE_COLOR=1 PY_COLORS=1 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -vvv
 
 ansible-smoke-deploy-renovate:
   <<: *default_ssh_ansible_job

@@ -1,0 +1,128 @@
+---
+- name: Sync Pangolin repo to selected docker hosts
+  hosts: >-
+    {{
+      (
+        [
+          pangolin_core_deploy_targets | default('', true),
+          pangolin_periphery_deploy_targets | default('', true)
+        ]
+        | reject('equalto', '')
+        | unique
+        | join(':')
+      )
+      if (
+        (pangolin_core_deploy_targets | default('', true) | length > 0)
+        or (pangolin_periphery_deploy_targets | default('', true) | length > 0)
+      )
+      else (pangolin_deploy_targets | default('pangolin_targets_missing'))
+    }}
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert Pangolin sync targets were provided
+      ansible.builtin.assert:
+        that:
+          - >
+            (
+              (
+                [
+                  pangolin_core_deploy_targets | default('', true),
+                  pangolin_periphery_deploy_targets | default('', true)
+                ]
+                | reject('equalto', '')
+                | unique
+                | join(':')
+              )
+              if (
+                (pangolin_core_deploy_targets | default('', true) | length > 0)
+                or (pangolin_periphery_deploy_targets | default('', true) | length > 0)
+              )
+              else (pangolin_deploy_targets | default('', true))
+            ) | length > 0
+        fail_msg: >-
+          Pangolin deploy requires either pangolin_deploy_targets or the split
+          pangolin_core_deploy_targets / pangolin_periphery_deploy_targets vars.
+      changed_when: false
+
+    - name: Sync Pangolin repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "Pangolin"
+        compose_app_name: "pangolin"
+        compose_repo_deploy_key_private: "{{ pangolin_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ pangolin_git_known_hosts }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_PANGOLIN_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ pangolin_infisical_project_id }}"
+        compose_repo_infisical_token: "{{ pangolin_infisical_token }}"
+        # Pangolin needs multiple repo-local env files, so callers must pass an
+        # explicit export map instead of relying on the generic single-.env default.
+        compose_repo_env_exports: >-
+          {{
+            pangolin_repo_env_exports
+            | default(
+                (
+                  (pangolin_repo_env_exports_json | default('', true) | trim) | length > 0
+                )
+                | ternary((pangolin_repo_env_exports_json | from_yaml), []),
+                true
+              )
+          }}
+      tags: [sync, core, periphery]
+
+- name: Deploy Pangolin core
+  hosts: "{{ pangolin_core_deploy_targets | default(pangolin_deploy_targets | default('pangolin_targets_missing')) }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Pangolin core deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - >
+            (pangolin_core_deploy_targets | default(pangolin_deploy_targets | default('', true), true)) | length > 0
+        fail_msg: >-
+          Pangolin core deploy requires either pangolin_deploy_targets or
+          pangolin_core_deploy_targets.
+      changed_when: false
+
+    - name: Run Pangolin core deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Pangolin"
+        compose_app_name: "pangolin"
+        compose_deploy_args:
+          - --core
+      tags: [core]
+
+- name: Deploy Pangolin periphery
+  hosts: "{{ pangolin_periphery_deploy_targets | default(pangolin_deploy_targets | default('pangolin_targets_missing')) }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert Pangolin periphery deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - >
+            (pangolin_periphery_deploy_targets | default(pangolin_deploy_targets | default('', true), true)) | length > 0
+        fail_msg: >-
+          Pangolin periphery deploy requires either pangolin_deploy_targets or
+          pangolin_periphery_deploy_targets.
+      changed_when: false
+
+    - name: Run Pangolin periphery deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "Pangolin"
+        compose_app_name: "pangolin"
+        compose_deploy_args:
+          - --periphery
+      tags: [periphery]
