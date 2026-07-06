@@ -142,7 +142,7 @@ ansible-detect-provision-state:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for DETECT_TARGETS=$DETECT_TARGETS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/00-detect.yml --limit "$DETECT_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e "detect_targets=$DETECT_TARGETS" -e "detect_output_dir=$CI_PROJECT_DIR/detect"
@@ -188,7 +188,7 @@ ansible-dry-run-lifecycle:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for TARGET_HOSTS=$TARGET_HOSTS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
     - |
@@ -300,7 +300,7 @@ ansible-provision-hosts:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected provision targets" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
     - |
       python3 - <<'PY'
@@ -360,7 +360,7 @@ ansible-apply-lifecycle:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for LIFECYCLE_TARGETS=$LIFECYCLE_TARGETS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
     - |
       if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
@@ -417,7 +417,7 @@ ansible-apply-updates:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for UPDATE_TARGETS=$UPDATE_TARGETS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
   script:
     - printf 'UPDATE_TARGETS=%s\n' "$UPDATE_TARGETS"
@@ -474,7 +474,7 @@ ansible-smoke-deploy-renovate:
           print(host)
       PY
     - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for RENOVATE_DEPLOY_TARGETS=$RENOVATE_DEPLOY_TARGETS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts
+    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
     - chmod 644 .ansible/known_hosts
     - |
       python3 - <<'PY'
