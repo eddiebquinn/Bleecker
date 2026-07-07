@@ -30,9 +30,9 @@
         echo "=== ESTABLISHED_CONNECTIONS ==="
         ss -tn state established 2>/dev/null | head -500 || true
         echo "=== CONTAINERS ==="
-        docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Networks}}' 2>/dev/null || true
+        docker ps --format 'json' 2>/dev/null || true
         echo "=== DOCKER_NETWORKS ==="
-        docker network ls --format 'table {{.ID}}\t{{.Name}}\t{{.Driver}}\t{{.Scope}}' 2>/dev/null || true
+        docker network ls --format 'json' 2>/dev/null || true
       args:
         executable: /bin/bash
       register: host_state
@@ -43,7 +43,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         if [ -d /etc/komodo/repos ]; then
-          find /etc/komodo/repos -maxdepth 2 -name 'compose.yml' -o -name 'docker-compose.yml' 2>/dev/null | sort
+          find /etc/komodo/repos -maxdepth 2 \( -name 'compose.yml' -o -name 'docker-compose.yml' \) 2>/dev/null | sort
         else
           echo "NO_KOMODO_REPO_ROOT"
         fi
