@@ -1,0 +1,51 @@
+---
+- name: Sync fmd-foss repo to selected docker hosts
+  hosts: "{{ fmd-foss_deploy_targets | default('fmd-foss_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert fmd-foss deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - fmd-foss_deploy_targets is defined
+          - fmd-foss_deploy_targets | length > 0
+        fail_msg: >-
+          fmd-foss deploy requires fmd-foss_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync fmd-foss repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "fmd-foss"
+        compose_app_name: "fmd-foss"
+        compose_repo_deploy_key_private: "{{ fmd-foss_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ fmd-foss_git_known_hosts }}"
+      tags: [sync, core]
+
+- name: Deploy fmd-foss to selected docker hosts
+  hosts: "{{ fmd-foss_deploy_targets | default('fmd-foss_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert fmd-foss deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - fmd-foss_deploy_targets is defined
+          - fmd-foss_deploy_targets | length > 0
+        fail_msg: >-
+          fmd-foss deploy requires fmd-foss_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run fmd-foss deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "fmd-foss"
+        compose_app_name: "fmd-foss"
+      tags: [core]
