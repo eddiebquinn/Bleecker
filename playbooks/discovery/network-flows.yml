@@ -1,0 +1,92 @@
+---
+- name: Discover network flows across managed hosts
+  hosts: "{{ discovery_targets | default('managed') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    network_flows_output_dir: "{{ lookup('env', 'CI_PROJECT_DIR') | default(lookup('env', 'PWD'), true) }}/evidence/network-flows"
+
+  tasks:
+    - name: Ensure evidence directory exists
+      ansible.builtin.file:
+        path: "{{ network_flows_output_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+
+    - name: Collect host network state
+      ansible.builtin.shell: |
+        set -o pipefail
+        echo "=== HOSTNAME ==="
+        hostname -f 2>/dev/null || hostname
+        echo "=== ADDRESSES ==="
+        hostname -I 2>/dev/null || true
+        echo "=== ROUTES ==="
+        ip route show 2>/dev/null || netstat -rn 2>/dev/null || true
+        echo "=== LISTENING_SOCKETS ==="
+        ss -tupln 2>/dev/null || netstat -tupln 2>/dev/null || true
+        echo "=== ESTABLISHED_CONNECTIONS ==="
+        ss -tn state established 2>/dev/null | head -500 || true
+        echo "=== CONTAINERS ==="
+        docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Networks}}' 2>/dev/null || true
+        echo "=== DOCKER_NETWORKS ==="
+        docker network ls --format 'table {{.ID}}\t{{.Name}}\t{{.Driver}}\t{{.Scope}}' 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      register: host_state
+      changed_when: false
+      ignore_errors: true
+
+    - name: Collect deployed compose stack list from Komodo repo root
+      ansible.builtin.shell: |
+        set -o pipefail
+        if [ -d /etc/komodo/repos ]; then
+          find /etc/komodo/repos -maxdepth 2 -name 'compose.yml' -o -name 'docker-compose.yml' 2>/dev/null | sort
+        else
+          echo "NO_KOMODO_REPO_ROOT"
+        fi
+      args:
+        executable: /bin/bash
+      register: komodo_stacks
+      changed_when: false
+      ignore_errors: true
+
+    - name: Collect TrueNAS share information
+      ansible.builtin.shell: |
+        set -o pipefail
+        echo "=== SMB_SHARES ==="
+        midclt call sharing.smb.query 2>/dev/null || true
+        echo "=== NFS_SHARES ==="
+        midclt call sharing.nfs.query 2>/dev/null || true
+        echo "=== ISCSI_TARGETS ==="
+        midclt call iscsi.target.query 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      register: truenas_shares
+      changed_when: false
+      ignore_errors: true
+      when: inventory_hostname in ['datafortress-1']
+
+    - name: Structure host snapshot
+      ansible.builtin.set_fact:
+        host_snapshot:
+          host: "{{ inventory_hostname }}"
+          ansible_host: "{{ ansible_host | default(inventory_hostname) }}"
+          gathered_at: "{{ ansible_date_time.iso8601 }}"
+          raw: "{{ host_state.stdout | default('') }}"
+          komodo_stacks: "{{ komodo_stacks.stdout | default('') }}"
+          truenas_shares: "{{ truenas_shares.stdout | default('') }}"
+
+    - name: Write host snapshot to evidence directory
+      ansible.builtin.copy:
+        content: "{{ host_snapshot | to_nice_json(indent=2) }}"
+        dest: "{{ network_flows_output_dir }}/{{ inventory_hostname }}.json"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+
+    - name: Print summary for host
+      ansible.builtin.debug:
+        msg: "Captured network snapshot for {{ inventory_hostname }} -> evidence/network-flows/{{ inventory_hostname }}.json"
