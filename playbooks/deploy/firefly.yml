@@ -1,0 +1,51 @@
+---
+- name: Sync firefly-iii repo to selected docker hosts
+  hosts: "{{ firefly_deploy_targets | default('firefly_targets_missing') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Assert firefly deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - firefly_deploy_targets is defined
+          - firefly_deploy_targets | length > 0
+        fail_msg: >-
+          firefly deploy requires firefly_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync firefly-iii repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "firefly-iii"
+        compose_app_name: "firefly-iii"
+        compose_repo_deploy_key_private: "{{ firefly_repo_deploy_key_private }}"
+        compose_git_known_hosts: "{{ firefly_git_known_hosts }}"
+      tags: [sync, core]
+
+- name: Deploy firefly-iii to selected docker hosts
+  hosts: "{{ firefly_deploy_targets | default('firefly_targets_missing') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Assert firefly deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - firefly_deploy_targets is defined
+          - firefly_deploy_targets | length > 0
+        fail_msg: >-
+          firefly deploy requires firefly_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run firefly-iii deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "firefly-iii"
+        compose_app_name: "firefly-iii"
+      tags: [core]
