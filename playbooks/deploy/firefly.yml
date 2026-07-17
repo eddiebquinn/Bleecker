@@ -23,6 +23,10 @@
         compose_app_name: "firefly-iii"
         compose_repo_deploy_key_private: "{{ firefly_repo_deploy_key_private }}"
         compose_git_known_hosts: "{{ firefly_git_known_hosts }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env', 'DEPLOYMENT_FIREFLY_INFISICAL_SYNC_ENABLED', default='true') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ firefly_infisical_project_id }}"
+        compose_repo_infisical_token: "{{ firefly_infisical_token }}"
       tags: [sync, core]
 
 - name: Deploy firefly-iii to selected docker hosts
