@@ -1,0 +1,3 @@
+# Override docker_hosts group defaults — pangolin-1 is a VPS, not LAN.
+# Do not configure registry mirrors; it pulls images direct over WAN.
+docker_daemon_config: {}

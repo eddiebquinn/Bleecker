@@ -34,3 +34,8 @@ docker_conflicting_packages_ubuntu:
 
 docker_registry_auth_enabled: false
 docker_registry_auth_entries: []
+
+# Docker daemon.json configuration — dict merged on top of Docker defaults.
+# Set per-group or per-host to add registry-mirrors, log-driver, etc.
+# Empty dict means leave daemon.json untouched (Docker manages its own defaults).
+docker_daemon_config: {}

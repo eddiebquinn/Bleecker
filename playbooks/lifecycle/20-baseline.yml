@@ -13,3 +13,18 @@
       when: "'docker_hosts' in group_names"
     - role: k3s_agent_user
       when: "'k3s_hosts' in group_names"
+
+  tasks:
+    - name: Configure apt cache proxy (infstack-1 apt-cacher-ng)
+      ansible.builtin.copy:
+        content: |
+          Acquire::http::Proxy "http://cache-proxies.infra.local.eddiequinn.casa:3142";
+          Acquire::https::Proxy "DIRECT";
+        dest: /etc/apt/apt.conf.d/01proxy
+        owner: root
+        group: root
+        mode: "0644"
+      when:
+        - ansible_facts.os_family == "Debian"
+        - "'pangolin-1' not in inventory_hostname"
+        - not ansible_check_mode
