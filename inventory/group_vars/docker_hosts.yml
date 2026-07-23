@@ -21,6 +21,13 @@ infisical_domain: "https://infisical.eddiequinn.casa/api"
 # Docker package management is enabled so fresh Docker hosts can bootstrap cleanly
 docker_manage_packages: true
 
+# Docker registry mirrors for local caching proxies (infstack-1)
+# All docker_hosts pull through the LAN caches except pangolin-1 (VPS).
+docker_daemon_config:
+  registry-mirrors:
+    - "http://cache-proxies.infra.local.eddiequinn.casa:5000"
+    - "http://cache-proxies.infra.local.eddiequinn.casa:5001"
+
 # Cloudflare Utils vars
 
 # Renovate vars

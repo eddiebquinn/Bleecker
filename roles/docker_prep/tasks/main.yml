@@ -252,3 +252,38 @@
     - docker_prep_enabled | bool
     - docker_registry_auth_enabled | bool
     - not ansible_check_mode
+
+- name: Ensure Docker daemon config directory exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - docker_prep_enabled | bool
+    - docker_daemon_config | default({}) | length > 0
+
+- name: Write Docker daemon.json
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  register: docker_daemon_json
+  when:
+    - docker_prep_enabled | bool
+    - docker_daemon_config | default({}) | length > 0
+    - not ansible_check_mode
+
+- name: Restart Docker after daemon.json change
+  ansible.builtin.systemd:
+    name: "{{ docker_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when:
+    - docker_prep_enabled | bool
+    - docker_daemon_config | default({}) | length > 0
+    - not ansible_check_mode
+    - docker_daemon_json is changed
