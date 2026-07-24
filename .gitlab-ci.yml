@@ -88,10 +88,10 @@ ansible-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --syntax-check
-    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml --syntax-check
-    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/monitoring-stack.yml --syntax-check
-    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/cloudflare-utils.yml --syntax-check
-    - ansible-playbook -i inventory/hosts.yml playbooks/deploy/pangolin.yml --syntax-check
+    - |
+      for f in playbooks/deploy/*.yml; do
+        ansible-playbook -i inventory/hosts.yml "$f" --syntax-check
+      done
 
 ansible-detect-provision-state:
   <<: *default_ssh_ansible_job

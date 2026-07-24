@@ -24,10 +24,13 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 ├── site.yml
 ├── inventory/
 │   ├── hosts.yml
-│   └── group_vars/
-│       ├── all.yml
-│       ├── docker_hosts.yml
-│       └── k3s_hosts.yml
+│   ├── group_vars/
+│   │   ├── all.yml
+│   │   ├── docker_hosts.yml
+│   │   └── k3s_hosts.yml
+│   └── host_vars/
+│       └── pangolin-1/
+│           └── main.yml
 ├── playbooks/
 │   ├── lifecycle/
 │   │   ├── 00-detect.yml
@@ -35,12 +38,14 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   │   ├── 20-baseline.yml
 │   │   └── 30-apt-upgrade.yml
 │   ├── deploy/
-│   │   ├── cloudflare-utils.yml
-│   │   ├── komodo.yml
-│   │   ├── monitoring-stack.yml
-│   │   └── renovate.yml
+│   │   ├── _app.yml              # generic import template (Phase 1)
+│   │   ├── komodo.yml             # core/periphery split
+│   │   ├── monitoring-stack.yml   # core/exporter split
+│   │   ├── pangolin.yml           # core/periphery + multi-env
+│   │   └── (26 thin wrappers)     # 3-line import_playbook each
 │   └── discovery/
-│       └── docker-state.yml
+│       ├── docker-state.yml
+│       └── network-flows.yml
 ├── roles/
 │   ├── users/
 │   ├── ssh_hardening/
@@ -49,7 +54,7 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   ├── docker_prep/
 │   ├── k3s_agent_user/
 │   ├── komodo_deploy/
-│   └── ...
+│   └── compose_repo_deploy/
 ├── flake.nix
 ├── flake.lock
 ├── .envrc
@@ -183,35 +188,21 @@ ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml \
 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml
 ```
 
-### Docker standardisation note
+### Docker package standardisation
 
-For `docker_hosts`, the `docker_prep` role now contains scaffolding for Docker package cleanup and installation using Docker's official apt repository.
+For `docker_hosts`, the `docker_prep` role manages Docker package standardisation using Docker's official apt repository.
 
-Current safety posture:
+Current behaviour:
 
-* `docker_manage_packages` defaults to `false`
-* package standardisation is therefore **not** active by default in normal lifecycle runs yet
-* this is intentional so discovery, canary rollout, and cleanup logic can be validated before broad rollout
+* `docker_manage_packages` is `true` in `docker_hosts` group vars — standardisation is active
+* Conflicting distro packages are removed (without `apt purge` to protect live `/var/lib/docker` state)
+* Standard packages installed: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`
 
-The intended target package set is:
+Conflicting packages removed:
 
-* `docker-ce`
-* `docker-ce-cli`
-* `containerd.io`
-* `docker-buildx-plugin`
-* `docker-compose-plugin`
+* `docker.io`, `docker-compose`, `docker-compose-v2`, `docker-doc`, `podman-docker`, `containerd`, `runc`
 
-The intended conflicting package cleanup set includes:
-
-* `docker.io`
-* `docker-compose`
-* `docker-compose-v2`
-* `docker-doc`
-* `podman-docker`
-* `containerd`
-* `runc`
-
-Conflicting packages are removed without `apt purge` so distro package post-removal scripts do not try to wipe live Docker state under `/var/lib/docker` during canary migration.
+> Note: `docker_manage_packages` defaults to `false` in the role's `defaults/main.yml` for safety, but is set to `true` in `group_vars/docker_hosts.yml` where Docker hosts are defined.
 
 **Perform system upgrade**
 ```bash
@@ -340,12 +331,18 @@ Compose-based application deploys live under:
 playbooks/deploy/
 ```
 
-Current playbooks:
-- `playbooks/deploy/komodo.yml`
-- `playbooks/deploy/monitoring-stack.yml`
-- `playbooks/deploy/cloudflare-utils.yml`
-- `playbooks/deploy/renovate.yml`
-- `playbooks/deploy/pangolin.yml`
+The deploy directory contains 29 playbooks — 26 of which are structurally identical
+thin wrappers around a shared `_app.yml` import template, differing only by app name.
+The 3 structural exceptions handle multi-domain host split patterns (core/periphery):
+
+| Playbook | Pattern | Deploy targets |
+|---|---|---|
+| `playbooks/deploy/komodo.yml` | core/periphery split | `komodo_core_deploy_targets` + `komodo_periphery_deploy_targets` |
+| `playbooks/deploy/pangolin.yml` | core/periphery + multi-env | `pangolin_core_deploy_targets` + `pangolin_periphery_deploy_targets` or `pangolin_deploy_targets` |
+| `playbooks/deploy/monitoring-stack.yml` | core/exporters split with custom env exports | `monitoring_core_deploy_targets` + `monitoring_exporter_deploy_targets` |
+| All others (26) | single-domain `_app.yml` import | `{app}_deploy_targets` (auto-derived) |
+
+Adding a new compose app = one 3-line playbook + one CI variable set.
 
 These playbooks now follow a more generic contract:
 - shared path conventions come from inventory (`deploy_root`, `ssh_root`, `compose_repo_root`)
@@ -400,19 +397,21 @@ These should normally come from CI/CD variables or manual `-e` inputs rather tha
 
 ### Manual examples
 
-**Komodo**
+**Komodo (manual run)**
 ```bash
 ansible-playbook -i inventory/hosts.yml playbooks/deploy/komodo.yml \
   -e komodo_core_deploy_targets=devstack-1 \
   -e komodo_periphery_deploy_targets=devstack-1 \
-  -e @vars/komodo-secrets.yml
+  -e komodo_repo_deploy_key_private="$(cat ~/.ssh/my_deploy_key)" \
+  -e komodo_git_known_hosts="$(ssh-keyscan -t ed25519 gitlab.eddiequinn.casa 2>/dev/null)"
 ```
 
-**Renovate**
+**Renovate (manual run)**
 ```bash
 ansible-playbook -i inventory/hosts.yml playbooks/deploy/renovate.yml \
   -e renovate_deploy_targets=devstack-1 \
-  -e @vars/renovate-secrets.yml
+  -e renovate_repo_deploy_key_private="$(cat ~/.ssh/my_deploy_key)" \
+  -e renovate_git_known_hosts="$(ssh-keyscan -t ed25519 gitlab.eddiequinn.casa 2>/dev/null)"
 ```
 
 ## Automated Updates
