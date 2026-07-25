@@ -208,6 +208,26 @@ ansible-provision-hosts:
       python3 - <<'PY'
       import os
       from pathlib import Path
+      targets = [line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()]
+      if not targets:
+          raise SystemExit("No targets in /tmp/ansible_target_names.txt")
+      unprovisioned = {line.strip() for line in Path('detect/unprovisioned_hosts.txt').read_text().splitlines() if line.strip()}
+      selected = [host for host in targets if host in unprovisioned]
+      Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
+      if not selected:
+          print("No unprovisioned hosts matched PROVISION_TARGETS=" + os.environ.get("PROVISION_TARGETS", ""))
+          print("Available unprovisioned hosts:")
+          for h in sorted(unprovisioned):
+              print("  -", h)
+          raise SystemExit(1)
+      PY
+    - |
+      export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)
+      echo "Resolved provision targets: $RESOLVED_TARGETS"
+    - |
+      python3 - <<'PY'
+      import os
+      from pathlib import Path
       def yaml_quote(value: str) -> str:
           return "'" + value.replace("'", "''") + "'"
       Path('/tmp/provision-vars.yml').write_text(
