@@ -1,4 +1,5 @@
 ---
 - import_playbook: _app.yml
   vars:
-    compose_app_name: firefly
+    compose_app_name: firefly-iii
+    compose_vars_prefix: firefly
