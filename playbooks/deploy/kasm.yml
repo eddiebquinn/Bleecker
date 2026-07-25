@@ -1,5 +1,0 @@
----
-- import_playbook: _app.yml
-  vars:
-    compose_app_name: kasm
-    compose_repo_label: KASM
