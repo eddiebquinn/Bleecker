@@ -19,7 +19,7 @@
 # own playbooks because they use multi-domain core/periphery patterns.
 
 - name: Sync {{ compose_repo_label | default(compose_app_name) }} repo to selected docker hosts
-  hosts: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default=(compose_app_name | regex_replace('-', '_')) ~ '_targets_missing') }}"
+  hosts: "{{ lookup('vars', (compose_vars_prefix | default(compose_app_name | regex_replace('-', '_'))) ~ '_deploy_targets', default=(compose_vars_prefix | default(compose_app_name | regex_replace('-', '_'))) ~ '_targets_missing') }}"
   become: true
   gather_facts: true
   vars:
