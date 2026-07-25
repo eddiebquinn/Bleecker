@@ -9,7 +9,6 @@ include:
 stages:
   - scan
   - validate
-  - discover
   - test
   - apply
 
@@ -40,14 +39,6 @@ variables:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: on_success
-    - when: never
-
-.rules_detect: &rules_detect
-  rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -103,7 +94,10 @@ ansible-validate:
 
 ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
-  <<: *rules_detect
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   stage: discover
   needs:
     - job: ansible-validate
