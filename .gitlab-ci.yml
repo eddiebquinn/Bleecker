@@ -203,59 +203,7 @@ ansible-provision-hosts:
           exit 1
         fi
       fi
-    - mkdir -p ~/.ssh .ansible
-    - chmod 700 ~/.ssh
-    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
-    - chmod 600 ~/.ssh/ci_ansible_key
-    - ansible -i inventory/hosts.yml "$PROVISION_TARGETS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
-    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched PROVISION_TARGETS=$PROVISION_TARGETS" && exit 1)
-    - |
-      python3 - <<'PY'
-      from pathlib import Path
-      targets = [line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()]
-      unprovisioned = {line.strip() for line in Path('detect/unprovisioned_hosts.txt').read_text().splitlines() if line.strip()}
-      selected = [host for host in targets if host in unprovisioned]
-      Path('/tmp/ansible_selected_target_names.txt').write_text('\n'.join(selected) + ('\n' if selected else ''))
-      PY
-    - |
-      if [ ! -s /tmp/ansible_selected_target_names.txt ]; then
-        echo "No unprovisioned hosts matched PROVISION_TARGETS=$PROVISION_TARGETS"
-        echo "Available unprovisioned hosts:"
-        sed 's/^/- /' /tmp/unprovisioned_hosts.txt || true
-        exit 1
-      fi
-    - |
-      export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_selected_target_names.txt)
-      echo "Resolved provision targets: $RESOLVED_TARGETS"
-    - |
-      python3 - <<'PY' > /tmp/ansible_hosts.txt
-      import yaml
-      from pathlib import Path
-      data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
-      targets = {line.strip() for line in Path('/tmp/ansible_selected_target_names.txt').read_text().splitlines() if line.strip()}
-      hosts = []
-      all_hosts = data.get('all', {})
-      def walk_children(node):
-          if not isinstance(node, dict):
-              return
-          host_map = node.get('hosts', {})
-          if isinstance(host_map, dict):
-              for name, attrs in host_map.items():
-                  if name in targets and isinstance(attrs, dict):
-                      host = attrs.get('ansible_host', name)
-                      if host not in hosts:
-                          hosts.append(host)
-          children = node.get('children', {})
-          if isinstance(children, dict):
-              for child in children.values():
-                  walk_children(child)
-      walk_children(all_hosts)
-      for host in hosts:
-          print(host)
-      PY
-    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for selected provision targets" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
-    - chmod 644 .ansible/known_hosts
+    - source .ci/ci_prepare_ssh.sh PROVISION_TARGETS
     - |
       python3 - <<'PY'
       import os
@@ -278,44 +226,7 @@ ansible-apply-lifecycle:
     - job: ansible-validate
     - job: ansible-dry-run-lifecycle
   before_script:
-    - test -n "$LIFECYCLE_TARGETS" || (echo "LIFECYCLE_TARGETS is required" && exit 1)
-    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
-    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
-    - mkdir -p ~/.ssh .ansible
-    - chmod 700 ~/.ssh
-    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
-    - chmod 600 ~/.ssh/ci_ansible_key
-    - ansible -i inventory/hosts.yml "$LIFECYCLE_TARGETS" --list-hosts | tail -n +2 | tr -d ' ' > /tmp/ansible_target_names.txt
-    - test -s /tmp/ansible_target_names.txt || (echo "No hosts matched LIFECYCLE_TARGETS=$LIFECYCLE_TARGETS" && exit 1)
-    - |
-      python3 - <<'PY' > /tmp/ansible_hosts.txt
-      import yaml
-      from pathlib import Path
-      data = yaml.safe_load(Path('inventory/hosts.yml').read_text())
-      targets = {line.strip() for line in Path('/tmp/ansible_target_names.txt').read_text().splitlines() if line.strip()}
-      hosts = []
-      all_hosts = data.get('all', {})
-      def walk_children(node):
-          if not isinstance(node, dict):
-              return
-          host_map = node.get('hosts', {})
-          if isinstance(host_map, dict):
-              for name, attrs in host_map.items():
-                  if name in targets and isinstance(attrs, dict):
-                      host = attrs.get('ansible_host', name)
-                      if host not in hosts:
-                          hosts.append(host)
-          children = node.get('children', {})
-          if isinstance(children, dict):
-              for child in children.values():
-                  walk_children(child)
-      walk_children(all_hosts)
-      for host in hosts:
-          print(host)
-      PY
-    - test -s /tmp/ansible_hosts.txt || (echo "No ansible_host entries found for LIFECYCLE_TARGETS=$LIFECYCLE_TARGETS" && exit 1)
-    - xargs -r -n 1 ssh-keyscan -T 5 -H -t ed25519,rsa < /tmp/ansible_hosts.txt > .ansible/known_hosts || true
-    - chmod 644 .ansible/known_hosts
+    - source .ci/ci_prepare_ssh.sh LIFECYCLE_TARGETS
     - |
       if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
         test -n "${DOCKER_REGISTRY_AUTH_REGISTRY:-}" || (echo "DOCKER_REGISTRY_AUTH_REGISTRY is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
