@@ -23,7 +23,7 @@
   become: true
   gather_facts: true
   vars:
-    _app_safe_name: "{{ compose_app_name | regex_replace('-', '_') }}"
+    _app_safe_name: "{{ compose_vars_prefix | default(compose_app_name | regex_replace('-', '_')) }}"
   tasks:
     - name: Assert deploy targets were provided
       ansible.builtin.assert:
@@ -52,11 +52,11 @@
       tags: [sync, core]
 
 - name: Deploy {{ compose_repo_label | default(compose_app_name) }} to selected docker hosts
-  hosts: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default=(compose_app_name | regex_replace('-', '_')) ~ '_targets_missing') }}"
+  hosts: "{{ lookup('vars', (compose_vars_prefix | default(compose_app_name | regex_replace('-', '_'))) ~ '_deploy_targets', default=(compose_vars_prefix | default(compose_app_name | regex_replace('-', '_'))) ~ '_targets_missing') }}"
   become: true
   gather_facts: false
   vars:
-    _app_safe_name: "{{ compose_app_name | regex_replace('-', '_') }}"
+    _app_safe_name: "{{ compose_vars_prefix | default(compose_app_name | regex_replace('-', '_')) }}"
   tasks:
     - name: Assert deploy targets were provided
       ansible.builtin.assert:
