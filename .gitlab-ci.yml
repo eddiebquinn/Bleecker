@@ -89,7 +89,15 @@ ansible-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/20-baseline.yml --syntax-check
     - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --syntax-check
     - |
+      # Skip _app.yml: it's a parameterised template that requires a
+      # `compose_app_name` var to syntax-check cleanly. The 26 wrapper
+      # playbooks each import it via `import_playbook` and provide that
+      # var, so the template is implicitly covered when the wrappers are
+      # syntax-checked.
       for f in playbooks/deploy/*.yml; do
+        if [ "$(basename "$f")" = "_app.yml" ]; then
+          continue
+        fi
         ansible-playbook -i inventory/hosts.yml "$f" --syntax-check
       done
 

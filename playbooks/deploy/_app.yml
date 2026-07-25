@@ -1,0 +1,80 @@
+---
+# Generic single-domain deploy template for compose-repo apps.
+#
+# Designed to be imported by thin per-app wrapper playbooks that pass
+# `compose_app_name` (and optionally `compose_repo_label`).
+#
+# Variable name derivation: every app-level variable is fetched via
+# `lookup('vars', ...)` from a string key built from `compose_app_name`
+# with hyphens replaced by underscores. This is what makes the fmd-foss
+# hyphen-in-var-name bug class structurally impossible — the template
+# owns the underscore conversion.
+#
+# Apps that need only the deploy key + known hosts (no Infisical) work
+# transparently: the infisical_* vars default to empty strings and the
+# sync toggle reads from a (likely unset) env var, so the role skips all
+# Infisical steps via its own internal gating.
+#
+# Structural exceptions (komodo, pangolin, monitoring-stack) keep their
+# own playbooks because they use multi-domain core/periphery patterns.
+
+- name: Sync {{ compose_app_name }} repo to selected docker hosts
+  hosts: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default=(compose_app_name | regex_replace('-', '_')) ~ '_targets_missing') }}"
+  become: true
+  gather_facts: true
+  vars:
+    compose_repo_label: "{{ compose_repo_label | default(compose_app_name) }}"
+  tasks:
+    - name: Assert deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default='') | length > 0
+        fail_msg: >-
+          {{ compose_repo_label }} deploy requires
+          {{ compose_app_name | regex_replace('-', '_') }}_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Sync {{ compose_repo_label }} repo
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: sync
+      vars:
+        compose_repo_label: "{{ compose_repo_label }}"
+        compose_app_name: "{{ compose_app_name }}"
+        compose_repo_deploy_key_private: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_repo_deploy_key_private') }}"
+        compose_git_known_hosts: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_git_known_hosts') }}"
+        compose_repo_infisical_application_sync_enabled: >-
+          {{ (lookup('ansible.builtin.env',
+                     'DEPLOYMENT_' ~ (compose_app_name | upper | regex_replace('-', '_'))
+                     ~ '_INFISICAL_SYNC_ENABLED',
+                     default='') | trim | lower) in ['1', 'true', 'yes', 'on'] }}
+        compose_repo_infisical_project_id: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_infisical_project_id', default='') }}"
+        compose_repo_infisical_token: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_infisical_token', default='') }}"
+      tags: [sync, core]
+
+- name: Deploy {{ compose_app_name }} to selected docker hosts
+  hosts: "{{ lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default=(compose_app_name | regex_replace('-', '_')) ~ '_targets_missing') }}"
+  become: true
+  gather_facts: false
+  vars:
+    compose_repo_label: "{{ compose_repo_label | default(compose_app_name) }}"
+  tasks:
+    - name: Assert deploy targets were provided
+      ansible.builtin.assert:
+        that:
+          - lookup('vars', (compose_app_name | regex_replace('-', '_')) ~ '_deploy_targets', default='') | length > 0
+        fail_msg: >-
+          {{ compose_repo_label }} deploy requires
+          {{ compose_app_name | regex_replace('-', '_') }}_deploy_targets.
+          Pass it from CI to choose the target host(s) explicitly.
+      changed_when: false
+
+    - name: Run {{ compose_repo_label }} deployment
+      ansible.builtin.include_role:
+        name: compose_repo_deploy
+        tasks_from: run
+      vars:
+        compose_repo_label: "{{ compose_repo_label }}"
+        compose_app_name: "{{ compose_app_name }}"
+      tags: [core]
