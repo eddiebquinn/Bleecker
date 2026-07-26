@@ -16,6 +16,7 @@ stages:
 variables:
   ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:08e0295f"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
+  ANSIBLE_LOCAL_TMP: "$CI_PROJECT_DIR/.ansible/tmp"
   TARGET_HOSTS: "managed"
   DETECT_TARGETS: "managed"
   LIFECYCLE_TARGETS: "managed"
