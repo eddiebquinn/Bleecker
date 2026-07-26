@@ -1,0 +1,8 @@
+---
+# OPNsense Firewall configuration
+# TODO: implement firewall rule management, alias management, interface config
+# Uses opnsense.ansible collection (opnsense_firewall_alias, opnsense_firewall_rule modules)
+
+- name: Placeholder - no OPNsense tasks configured yet
+  ansible.builtin.debug:
+    msg: "opnsense_firewall role is a skeleton - tasks not yet implemented"

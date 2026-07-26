@@ -1,0 +1,3 @@
+---
+# Handlers for OPNsense config changes
+# TODO: add firewall rule reload handler

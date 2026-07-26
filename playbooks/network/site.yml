@@ -1,8 +1,12 @@
 ---
-- name: Configure network devices
-  hosts: network_devices
+- name: Configure RouterOS switches
+  hosts: routeros_switches
   gather_facts: yes
+  roles:
+    - role: routeros_l3_switch
 
-  tasks:
-    - name: Gather RouterOS facts
-      community.routeros.facts:
+- name: Configure OPNsense firewalls
+  hosts: opnsense_firewalls
+  gather_facts: yes
+  roles:
+    - role: opnsense_firewall
