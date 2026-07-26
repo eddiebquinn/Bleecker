@@ -87,6 +87,7 @@ ansible-network-dry-run:
       allow_failure: true
   before_script:
     - ansible-galaxy collection install -r requirements.yml
+    - pip3 install --quiet httpx
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - mkdir -p ~/.ssh .ansible
     - chmod 700 ~/.ssh

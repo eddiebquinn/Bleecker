@@ -4,5 +4,5 @@ collections:
     version: ">=3.0.0"
   - name: community.general
     version: ">=9.0.0"
-  - name: opnsense.ansible
+  - name: oxlorg.opnsense
     version: ">=1.0.0"

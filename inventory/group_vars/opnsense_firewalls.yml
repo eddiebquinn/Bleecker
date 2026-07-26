@@ -1,10 +1,12 @@
 ---
 # OPNsense firewall connection defaults
-# Uses the REST API via opnsense.ansible collection — not SSH
-ansible_connection: opnsense.ansible.httpapi
-ansible_httpapi_host: 10.67.45.1
-ansible_httpapi_port: 443
-ansible_httpapi_use_ssl: true
-ansible_httpapi_validate_certs: false
-ansible_httpapi_user: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_KEY') }}"
-ansible_httpapi_password: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_SECRET') }}"
+# OXL collection modules (oxlorg.opnsense.*) talk to the REST API via
+# module-level parameters (api_url, api_key, api_secret) — not a connection
+# plugin. So we just need a working SSH transport for the Ansible side.
+# The api credentials are picked up from CI vars and passed per-module
+# via the opnsense_firewall role.
+
+ansible_connection: ansible.builtin.ssh
+ansible_python_interpreter: /usr/local/bin/python3
+ansible_shell_type: sh
+ansible_user: semaphore-agent
