@@ -1,0 +1,12 @@
+---
+# OPNsense firewall connection defaults
+# OXL collection modules (oxlorg.opnsense.*) talk to the REST API via
+# module-level parameters (api_url, api_key, api_secret) — not a connection
+# plugin. So we just need a working SSH transport for the Ansible side.
+# The api credentials are picked up from CI vars and passed per-module
+# via the opnsense_firewall role.
+
+ansible_connection: ansible.builtin.ssh
+ansible_python_interpreter: /usr/local/bin/python3
+ansible_shell_type: sh
+ansible_user: semaphore-agent

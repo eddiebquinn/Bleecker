@@ -70,6 +70,35 @@ variables:
       when: manual
     - when: never
 
+ansible-network-validate:
+  <<: *default_ansible_job
+  stage: validate
+  rules:
+    - when: manual
+      allow_failure: true
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --syntax-check
+
+ansible-network-dry-run:
+  <<: *default_ansible_job
+  stage: test
+  rules:
+    - when: manual
+      allow_failure: true
+  before_script:
+    - ansible-galaxy collection install -r requirements.yml
+    - pip3 install --quiet httpx
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
+    - chmod 600 ~/.ssh/ci_network_key
+    - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
+    - export OPNSENSE_SEMAPHORE_KEY
+    - export OPNSENSE_SEMAPHORE_SECRET
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --check --diff
+
 ansible-validate:
   <<: *default_ansible_job
   <<: *rules_validate

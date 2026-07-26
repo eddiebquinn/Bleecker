@@ -1,0 +1,6 @@
+---
+# Shared defaults for all managed network devices
+# Device-type-specific connection params are in child group_vars:
+#   - inventory/group_vars/routeros_switches.yml  (CRS328)
+#   - inventory/group_vars/opnsense_firewalls.yml  (OPNsense)
+ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'

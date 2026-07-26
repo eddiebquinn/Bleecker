@@ -1,0 +1,8 @@
+---
+collections:
+  - name: community.routeros
+    version: ">=3.0.0"
+  - name: community.general
+    version: ">=9.0.0"
+  - name: oxlorg.opnsense
+    version: ">=1.0.0"
