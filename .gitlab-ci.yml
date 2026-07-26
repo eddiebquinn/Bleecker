@@ -101,7 +101,7 @@ ansible-detect-provision-state:
     - when: never
   stage: discover
   needs:
-    - job: ansible-validate
+    - job: ansible-dry-run-lifecycle
   artifacts:
     when: always
     paths:
