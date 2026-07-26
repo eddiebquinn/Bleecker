@@ -1,14 +1,13 @@
 ---
 - name: Gather service facts before managing Docker service
   ansible.builtin.service_facts:
-  when: docker_prep_enabled | bool
+  when: docker_registry_auth_enabled | bool
 
 - name: Explain why Docker registry auth login is skipped during check mode
   ansible.builtin.debug:
     msg: >-
       Skipping persistent Docker registry login in check mode because it requires a real docker login against the target registry.
   when:
-    - docker_prep_enabled | bool
     - docker_registry_auth_enabled | bool
     - ansible_check_mode
 
@@ -24,7 +23,6 @@
   loop_control:
     label: "{{ item.registry | default('missing-registry') }}"
   when:
-    - docker_prep_enabled | bool
     - docker_registry_auth_enabled | bool
     - not ansible_check_mode
 
@@ -36,7 +34,6 @@
     group: root
     mode: "0700"
   when:
-    - docker_prep_enabled | bool
     - docker_registry_auth_enabled | bool
     - not ansible_check_mode
 
@@ -58,7 +55,6 @@
   loop_control:
     label: "{{ item.registry }}"
   when:
-    - docker_prep_enabled | bool
     - docker_registry_auth_enabled | bool
     - not ansible_check_mode
 
@@ -69,9 +65,7 @@
     owner: root
     group: root
     mode: "0755"
-  when:
-    - docker_prep_enabled | bool
-    - docker_daemon_config | default({}) | length > 0
+  when: docker_daemon_config | default({}) | length > 0
 
 - name: Write Docker daemon.json
   ansible.builtin.copy:
@@ -82,7 +76,6 @@
     mode: "0644"
   register: docker_daemon_json
   when:
-    - docker_prep_enabled | bool
     - docker_daemon_config | default({}) | length > 0
     - not ansible_check_mode
 
@@ -92,7 +85,6 @@
     state: restarted
     daemon_reload: true
   when:
-    - docker_prep_enabled | bool
     - docker_daemon_config | default({}) | length > 0
     - not ansible_check_mode
     - docker_daemon_json is changed
