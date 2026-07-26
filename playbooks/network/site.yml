@@ -1,12 +1,12 @@
 ---
 - name: Configure RouterOS switches
   hosts: routeros_switches
-  gather_facts: yes
+  gather_facts: no
   roles:
     - role: routeros_l3_switch
 
 - name: Configure OPNsense firewalls
   hosts: opnsense_firewalls
-  gather_facts: yes
+  gather_facts: no
   roles:
     - role: opnsense_firewall
