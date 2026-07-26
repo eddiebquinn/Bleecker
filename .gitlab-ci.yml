@@ -81,7 +81,7 @@ ansible-network-validate:
 
 ansible-network-dry-run:
   <<: *default_ansible_job
-  stage: discover
+  stage: test
   rules:
     - when: manual
       allow_failure: true
