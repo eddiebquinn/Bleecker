@@ -9,8 +9,8 @@ include:
 stages:
   - scan
   - validate
-  - discover
   - test
+  - discover
   - apply
 
 variables:
@@ -97,7 +97,7 @@ ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: manual
+      when: on_success
     - when: never
   stage: discover
   needs:
@@ -117,8 +117,6 @@ ansible-detect-provision-state:
 ansible-discover-network-flows:
   <<: *default_ssh_ansible_job
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "web" && $DISCOVER_NETWORK_FLOWS == "true"'
-      when: on_success
     - when: never
   stage: discover
   artifacts:
