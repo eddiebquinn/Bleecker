@@ -1,6 +1,10 @@
 ---
 # OPNsense firewall connection defaults
-# FreeBSD-based — uses standard SSH, not network_cli
-# TODO: set up ansible_user and SSH key on opensense-1 before running network playbooks
-ansible_connection: ansible.builtin.ssh
-ansible_shell_type: sh
+# Uses the REST API via opnsense.ansible collection — not SSH
+ansible_connection: opnsense.ansible.httpapi
+ansible_httpapi_host: 10.67.45.1
+ansible_httpapi_port: 443
+ansible_httpapi_use_ssl: true
+ansible_httpapi_validate_certs: false
+ansible_httpapi_user: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_KEY') }}"
+ansible_httpapi_password: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_SECRET') }}"
