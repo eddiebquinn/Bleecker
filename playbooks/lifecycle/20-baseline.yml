@@ -9,7 +9,11 @@
     - ssh_hardening
     - apt_timers
     - motd_dynamic
-    - role: docker_prep
+    - role: docker_packages
+      when: "'docker_hosts' in group_names"
+    - role: docker_agent_user
+      when: "'docker_hosts' in group_names"
+    - role: docker_registry_auth
       when: "'docker_hosts' in group_names"
     - role: k3s_agent_user
       when: "'k3s_hosts' in group_names"

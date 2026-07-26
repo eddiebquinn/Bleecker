@@ -1,14 +1,4 @@
-docker_prep_enabled: false
 docker_manage_packages: false
-
-docker_agent_name: docker-agent
-docker_agent_uid: 1101
-docker_agent_gid: 1101
-docker_agent_home: /var/lib/docker-agent
-docker_agent_shell: /usr/sbin/nologin
-
-docker_agent_authorized_keys: []
-docker_agent_known_hosts: []
 
 docker_service_name: docker
 docker_apt_keyring_dir: /etc/apt/keyrings
@@ -31,11 +21,3 @@ docker_conflicting_packages_common:
   - runc
 docker_conflicting_packages_ubuntu:
   - docker-compose-v2
-
-docker_registry_auth_enabled: false
-docker_registry_auth_entries: []
-
-# Docker daemon.json configuration — dict merged on top of Docker defaults.
-# Set per-group or per-host to add registry-mirrors, log-driver, etc.
-# Empty dict means leave daemon.json untouched (Docker manages its own defaults).
-docker_daemon_config: {}

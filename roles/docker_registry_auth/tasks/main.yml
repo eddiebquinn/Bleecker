@@ -1,0 +1,90 @@
+---
+- name: Gather service facts before managing Docker service
+  ansible.builtin.service_facts:
+  when: docker_registry_auth_enabled | bool
+
+- name: Explain why Docker registry auth login is skipped during check mode
+  ansible.builtin.debug:
+    msg: >-
+      Skipping persistent Docker registry login in check mode because it requires a real docker login against the target registry.
+  when:
+    - docker_registry_auth_enabled | bool
+    - ansible_check_mode
+
+- name: Assert Docker registry auth entries are valid
+  ansible.builtin.assert:
+    that:
+      - item.registry | default('') | length > 0
+      - item.username | default('') | length > 0
+      - item.password | default('') | length > 0
+    fail_msg: >-
+      Docker registry auth is enabled but an entry is missing registry, username, or password.
+  loop: "{{ docker_registry_auth_entries }}"
+  loop_control:
+    label: "{{ item.registry | default('missing-registry') }}"
+  when:
+    - docker_registry_auth_enabled | bool
+    - not ansible_check_mode
+
+- name: Ensure root Docker config directory exists for persistent registry auth
+  ansible.builtin.file:
+    path: /root/.docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when:
+    - docker_registry_auth_enabled | bool
+    - not ansible_check_mode
+
+- name: Persist Docker registry login for root
+  ansible.builtin.command:
+    argv:
+      - docker
+      - login
+      - "{{ item.registry }}"
+      - --username
+      - "{{ item.username }}"
+      - --password-stdin
+  args:
+    stdin: "{{ item.password }}"
+  register: docker_registry_auth_login
+  changed_when: false
+  no_log: true
+  loop: "{{ docker_registry_auth_entries }}"
+  loop_control:
+    label: "{{ item.registry }}"
+  when:
+    - docker_registry_auth_enabled | bool
+    - not ansible_check_mode
+
+- name: Ensure Docker daemon config directory exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_daemon_config | default({}) | length > 0
+
+- name: Write Docker daemon.json
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  register: docker_daemon_json
+  when:
+    - docker_daemon_config | default({}) | length > 0
+    - not ansible_check_mode
+
+- name: Restart Docker after daemon.json change
+  ansible.builtin.systemd:
+    name: "{{ docker_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when:
+    - docker_daemon_config | default({}) | length > 0
+    - not ansible_check_mode
+    - docker_daemon_json is changed
