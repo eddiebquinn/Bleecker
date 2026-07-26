@@ -1,4 +1,4 @@
-docker_prep_enabled: true
+docker_agent_user_enabled: true
 
 docker_agent_name: docker-agent
 docker_agent_uid: 1101
