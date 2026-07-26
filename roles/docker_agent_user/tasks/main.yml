@@ -1,0 +1,34 @@
+---
+- name: Ensure docker-agent group exists
+  ansible.builtin.group:
+    name: "{{ docker_agent_name }}"
+    gid: "{{ docker_agent_gid }}"
+    system: true
+    state: present
+  when: docker_agent_user_enabled | bool
+
+- name: Ensure docker-agent user exists (no password, no interactive login)
+  ansible.builtin.user:
+    name: "{{ docker_agent_name }}"
+    uid: "{{ docker_agent_uid }}"
+    group: "{{ docker_agent_name }}"
+    shell: "{{ docker_agent_shell }}"
+    create_home: true
+    home: "{{ docker_agent_home }}"
+    system: true
+    password_lock: true
+    state: present
+  when: docker_agent_user_enabled | bool
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+  when: docker_agent_user_enabled | bool
+
+- name: Add docker-agent user to Docker group
+  ansible.builtin.user:
+    name: "{{ docker_agent_name }}"
+    groups: docker
+    append: true
+  when: docker_agent_user_enabled | bool
