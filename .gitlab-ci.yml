@@ -100,8 +100,6 @@ ansible-detect-provision-state:
       when: on_success
     - when: never
   stage: discover
-  needs:
-    - job: ansible-dry-run-lifecycle
   artifacts:
     when: always
     paths:
@@ -133,8 +131,6 @@ ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
   <<: *rules_test
   stage: test
-  needs:
-  - job: ansible-validate
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
@@ -155,7 +151,6 @@ ansible-provision-hosts:
   <<: *rules_manual_apply
   stage: apply
   needs:
-    - job: ansible-dry-run-lifecycle
     - job: ansible-detect-provision-state
       artifacts: true
   before_script:
@@ -236,8 +231,6 @@ ansible-apply-lifecycle:
   <<: *default_ssh_ansible_job
   <<: *rules_manual_apply
   stage: apply
-  needs:
-    - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh LIFECYCLE_TARGETS
     - |
@@ -256,8 +249,6 @@ ansible-apply-updates:
   <<: *default_ssh_ansible_job
   <<: *rules_update
   stage: apply
-  needs:
-    - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh UPDATE_TARGETS
   script:
