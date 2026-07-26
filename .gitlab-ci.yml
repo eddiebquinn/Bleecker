@@ -9,8 +9,8 @@ include:
 stages:
   - scan
   - validate
-  - discover
   - test
+  - discover
   - apply
 
 variables:
@@ -40,14 +40,6 @@ variables:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: on_success
-    - when: never
-
-.rules_detect: &rules_detect
-  rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -103,10 +95,13 @@ ansible-validate:
 
 ansible-detect-provision-state:
   <<: *default_ssh_ansible_job
-  <<: *rules_detect
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    - when: never
   stage: discover
   needs:
-    - job: ansible-validate
+    - job: ansible-dry-run-lifecycle
   artifacts:
     when: always
     paths:
@@ -122,12 +117,8 @@ ansible-detect-provision-state:
 ansible-discover-network-flows:
   <<: *default_ssh_ansible_job
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: manual
     - when: never
   stage: discover
-  needs:
-    - job: ansible-validate
   artifacts:
     when: always
     paths:
@@ -142,6 +133,8 @@ ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
   <<: *rules_test
   stage: test
+  needs:
+  - job: ansible-validate
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
@@ -162,6 +155,7 @@ ansible-provision-hosts:
   <<: *rules_manual_apply
   stage: apply
   needs:
+    - job: ansible-dry-run-lifecycle
     - job: ansible-detect-provision-state
       artifacts: true
   before_script:
@@ -243,7 +237,6 @@ ansible-apply-lifecycle:
   <<: *rules_manual_apply
   stage: apply
   needs:
-    - job: ansible-validate
     - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh LIFECYCLE_TARGETS
@@ -264,7 +257,7 @@ ansible-apply-updates:
   <<: *rules_update
   stage: apply
   needs:
-    - job: ansible-validate
+    - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh UPDATE_TARGETS
   script:
