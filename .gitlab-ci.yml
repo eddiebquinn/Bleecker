@@ -28,14 +28,6 @@ variables:
 
 .default_ssh_ansible_job: &default_ssh_ansible_job
   <<: *default_ansible_job
-  before_script:
-    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
-    - test -n "$ANSIBLE_USER" || (echo "ANSIBLE_USER is required" && exit 1)
-    - mkdir -p ~/.ssh .ansible detect
-    - chmod 700 ~/.ssh
-    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
-    - chmod 600 ~/.ssh/ci_ansible_key
-
 .rules_validate: &rules_validate
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
