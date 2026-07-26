@@ -153,6 +153,7 @@ ansible-provision-hosts:
   <<: *rules_manual_apply
   stage: apply
   needs:
+    - job: ansible-dry-run-lifecycle
     - job: ansible-detect-provision-state
       artifacts: true
   before_script:
@@ -234,7 +235,6 @@ ansible-apply-lifecycle:
   <<: *rules_manual_apply
   stage: apply
   needs:
-    - job: ansible-validate
     - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh LIFECYCLE_TARGETS
@@ -255,7 +255,7 @@ ansible-apply-updates:
   <<: *rules_update
   stage: apply
   needs:
-    - job: ansible-validate
+    - job: ansible-dry-run-lifecycle
   before_script:
     - source .ci/ci_prepare_ssh.sh UPDATE_TARGETS
   script:
