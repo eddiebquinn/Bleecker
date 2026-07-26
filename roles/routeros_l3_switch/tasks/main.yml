@@ -1,0 +1,7 @@
+---
+# RouterOS L3 Switch configuration
+# TODO: implement VLAN SVI configuration, OSPF routing, ACLs, mangle/PBR rules
+
+- name: Placeholder - no RouterOS tasks configured yet
+  ansible.builtin.debug:
+    msg: "routeros_l3_switch role is a skeleton - tasks not yet implemented"

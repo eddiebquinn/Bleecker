@@ -70,6 +70,15 @@ variables:
       when: manual
     - when: never
 
+ansible-network-validate:
+  <<: *default_ansible_job
+  stage: validate
+  rules:
+    - when: manual
+      allow_failure: true
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --syntax-check
+
 ansible-validate:
   <<: *default_ansible_job
   <<: *rules_validate
