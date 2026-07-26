@@ -14,7 +14,7 @@ stages:
   - apply
 
 variables:
-  ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:92feb7c2"
+  ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:abdfca84"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
   TARGET_HOSTS: "managed"
   DETECT_TARGETS: "managed"
@@ -86,8 +86,6 @@ ansible-network-dry-run:
     - when: manual
       allow_failure: true
   before_script:
-    - ansible-galaxy collection install -r requirements.yml
-    - pip3 install --quiet httpx
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - mkdir -p ~/.ssh .ansible
     - chmod 700 ~/.ssh
