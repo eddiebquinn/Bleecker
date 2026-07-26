@@ -129,7 +129,7 @@ ansible-detect-provision-state:
     - source .ci/ci_prepare_ssh.sh DETECT_TARGETS
     - mkdir -p detect
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/00-detect.yml --limit "$DETECT_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e "detect_targets=$DETECT_TARGETS" -e "detect_output_dir=$CI_PROJECT_DIR/detect"
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/00-detect.yml --limit "$DETECT_TARGETS" -e "detect_targets=$DETECT_TARGETS" -e "detect_output_dir=$CI_PROJECT_DIR/detect"
 
 ansible-discover-network-flows:
   <<: *default_ssh_ansible_job
@@ -144,7 +144,7 @@ ansible-discover-network-flows:
     - test -n "$DISCOVER_TARGETS" || export DISCOVER_TARGETS="managed"
     - source .ci/ci_prepare_ssh.sh DISCOVER_TARGETS
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/discovery/network-flows.yml --limit "$DISCOVER_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e "discovery_targets=$DISCOVER_TARGETS"
+    - ansible-playbook -i inventory/hosts.yml playbooks/discovery/network-flows.yml --limit "$DISCOVER_TARGETS" -e "discovery_targets=$DISCOVER_TARGETS"
 
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
@@ -163,7 +163,7 @@ ansible-dry-run-lifecycle:
         printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
       fi
   script:
-    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
+    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" -e @/tmp/docker-registry-auth-vars.json
 
 ansible-provision-hosts:
   <<: *default_ansible_job
@@ -244,7 +244,7 @@ ansible-provision-hosts:
       )
       PY
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --limit "$RESOLVED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/provision-vars.yml
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/10-provision.yml --limit "$RESOLVED_TARGETS" -e @/tmp/provision-vars.yml
 
 ansible-apply-lifecycle:
   <<: *default_ssh_ansible_job
@@ -262,7 +262,7 @@ ansible-apply-lifecycle:
         printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
       fi
   script:
-    - ansible-playbook -i inventory/hosts.yml site.yml --limit "$LIFECYCLE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
+    - ansible-playbook -i inventory/hosts.yml site.yml --limit "$LIFECYCLE_TARGETS" -e @/tmp/docker-registry-auth-vars.json
 
 ansible-apply-updates:
   <<: *default_ssh_ansible_job
@@ -276,4 +276,4 @@ ansible-apply-updates:
     - cat /tmp/ansible_target_names.txt
     - printf 'Resolved ansible_host values:\n'
     - cat /tmp/ansible_hosts.txt
-    - ANSIBLE_FORCE_COLOR=1 PY_COLORS=1 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -vvv
+    - ANSIBLE_FORCE_COLOR=1 PY_COLORS=1 ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/30-apt-upgrade.yml --limit "$UPDATE_TARGETS" -vvv
