@@ -1,0 +1,114 @@
+---
+- name: Remove conflicting Docker packages without purging Docker data
+  ansible.builtin.apt:
+    name: "{{ docker_conflicting_packages_common + (docker_conflicting_packages_ubuntu if ansible_facts.distribution == 'Ubuntu' else []) }}"
+    state: absent
+    autoremove: false
+    update_cache: true
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Ensure Docker apt keyring directory exists
+  ansible.builtin.file:
+    path: "{{ docker_apt_keyring_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Install Docker apt prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Download Docker apt GPG key
+  ansible.builtin.get_url:
+    url: "{{ (docker_apt_repo_baseurl_ubuntu if ansible_facts.distribution == 'Ubuntu' else docker_apt_repo_baseurl_debian) }}/gpg"
+    dest: "{{ docker_apt_keyring_path }}"
+    mode: "0644"
+    force: true
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Configure Docker apt repository
+  ansible.builtin.copy:
+    dest: "/etc/apt/sources.list.d/{{ docker_apt_repo_filename }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ docker_apt_repo_baseurl_ubuntu if ansible_facts.distribution == 'Ubuntu' else docker_apt_repo_baseurl_debian }}
+      Suites: {{ ansible_facts.lsb.codename if ansible_facts.distribution == 'Ubuntu' else ansible_facts.distribution_release }}
+      Components: stable
+      Architectures: {{ ansible_facts.architecture | replace('x86_64', 'amd64') }}
+      Signed-By: {{ docker_apt_keyring_path }}
+  register: docker_apt_repo_config
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Refresh apt cache after Docker repo changes
+  ansible.builtin.apt:
+    update_cache: true
+  register: docker_apt_cache_refresh
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - docker_apt_repo_config is changed
+
+- name: Check Docker CE package candidate availability
+  ansible.builtin.command: apt-cache policy docker-ce
+  register: docker_ce_policy
+  check_mode: false
+  changed_when: false
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Fail if Docker CE package is unavailable after repo refresh
+  ansible.builtin.fail:
+    msg: >-
+      docker-ce is not available from configured apt sources on this host even after refreshing cache.
+      apt-cache policy output:
+      {{ docker_ce_policy.stdout | default('no output') }}
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - "'Candidate: (none)' in (docker_ce_policy.stdout | default(''))"
+
+- name: Install standard Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Gather service facts before managing Docker service
+  ansible.builtin.service_facts:
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: "{{ docker_service_name }}"
+    state: started
+    enabled: true
+  when:
+    - docker_manage_packages | bool
+    - ansible_facts.os_family == "Debian"
+    - not ansible_check_mode or (ansible_facts.services | default({})).get(docker_service_name + '.service') is not none
