@@ -1,0 +1,8 @@
+---
+- name: Configure network devices
+  hosts: network_devices
+  gather_facts: yes
+
+  tasks:
+    - name: Gather RouterOS facts
+      community.routeros.facts:
