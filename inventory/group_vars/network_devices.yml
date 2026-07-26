@@ -1,6 +1,6 @@
 ---
-# Shared defaults for all Ansible-managed network devices
-ansible_connection: ansible.netcommon.network_cli
-ansible_network_os: community.routeros.routeros
-ansible_user: admin
+# Shared defaults for all managed network devices
+# Device-type-specific connection params are in child group_vars:
+#   - inventory/group_vars/routeros_switches.yml  (CRS328)
+#   - inventory/group_vars/opnsense_firewalls.yml  (OPNsense)
 ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'

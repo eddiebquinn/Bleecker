@@ -1,0 +1,6 @@
+---
+# OPNsense firewall connection defaults
+# FreeBSD-based — uses standard SSH, not network_cli
+# TODO: set up ansible_user and SSH key on opensense-1 before running network playbooks
+ansible_connection: ansible.builtin.ssh
+ansible_shell_type: sh
