@@ -133,6 +133,8 @@ ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
   <<: *rules_test
   stage: test
+  needs:
+  - job: ansible-validate
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
