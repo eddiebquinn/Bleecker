@@ -39,6 +39,8 @@ mkdir -p ~/.ssh .ansible
 chmod 700 ~/.ssh
 printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_ansible_key
 chmod 600 ~/.ssh/ci_ansible_key
+export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_ansible_key
+export ANSIBLE_REMOTE_USER="$ANSIBLE_USER"
 
 # ── Resolve target hostnames ──
 ansible_extra_args="${_CI_ANSIBLE_EXTRA_ARGS:-}"
