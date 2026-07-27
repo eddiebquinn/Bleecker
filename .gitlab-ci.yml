@@ -108,7 +108,7 @@ ansible-network-discover-state:
     - export OPNSENSE_SEMAPHORE_KEY
     - export OPNSENSE_SEMAPHORE_SECRET
   script:
-    - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml -v
 
 ansible-validate:
   <<: *default_ansible_job
