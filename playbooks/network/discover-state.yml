@@ -19,6 +19,10 @@
   gather_facts: no
   vars:
     output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+    # Increase the CLI command timeout — /interface print detail on a 50+ port
+    # CRS328 exceeds the default 30s. This is the connection-level timeout for
+    # the ansible.netcommon.network_cli connection plugin, not a module param.
+    ansible_persistent_command_timeout: 120
 
   tasks:
     - name: Create output directory
@@ -50,7 +54,6 @@
         commands:
           - /interface print detail
           - /interface bridge port print detail
-        timeout: 120
       register: interfaces
 
     - name: Save interfaces
@@ -77,7 +80,6 @@
       community.routeros.command:
         commands:
           - /ip route print detail
-        timeout: 120
       register: routes
 
     - name: Save routes
@@ -105,7 +107,6 @@
       community.routeros.command:
         commands:
           - /ip firewall filter print detail
-        timeout: 120
       register: fw_filter
 
     - name: Save firewall filter
@@ -118,7 +119,6 @@
       community.routeros.command:
         commands:
           - /ip firewall nat print detail
-        timeout: 120
       register: fw_nat
 
     - name: Save firewall NAT
@@ -131,7 +131,6 @@
       community.routeros.command:
         commands:
           - /ip firewall mangle print detail
-        timeout: 120
       register: fw_mangle
 
     - name: Save firewall mangle
