@@ -182,8 +182,13 @@
 - name: Discover OPNsense state — blackice-1
   hosts: opnsense_firewalls
   gather_facts: no
+  # Run tasks locally — we're calling the OPNsense REST API, not SSHing in
+  connection: local
   vars:
     output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+    opn_host: "{{ hostvars['blackice-1']['ansible_host'] | default('10.67.45.1') }}"
+    opn_api_key: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_KEY') }}"
+    opn_api_secret: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_SECRET') }}"
 
   tasks:
     - name: Create output directory
@@ -194,118 +199,123 @@
       run_once: true
       changed_when: false
 
-    # ── System info ──
+    # ── System info via API ──
     - name: System information
-      ansible.builtin.raw: |
-        uname -a
-        echo "=== VERSION ==="
-        cat /usr/local/opnsense/version/opnsense.txt 2>/dev/null || echo "not found"
-        echo "=== UPTIME ==="
-        uptime
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/system/info"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
       register: system_info
+      ignore_errors: yes
 
     - name: Save system info
       ansible.builtin.copy:
-        content: "{{ system_info.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.txt"
+        content: "{{ system_info.json if system_info is defined and system_info.get('json') else (system_info.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.json"
       delegate_to: localhost
 
-    # ── Interfaces ──
-    - name: Interface configuration
-      ansible.builtin.raw: |
-        ifconfig
-        echo "=== INTERFACE ASSIGNMENTS ==="
-        cat /conf/opnsense.xml 2>/dev/null | grep -A1 '<interface>' || echo "not found in /conf/opnsense.xml"
-      register: interfaces
+    # ── Interfaces via API ──
+    - name: Interface names
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceNames"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: iface_names
+      ignore_errors: yes
 
-    - name: Save interfaces
+    - name: Save interface names
       ansible.builtin.copy:
-        content: "{{ interfaces.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interfaces.txt"
+        content: "{{ iface_names.json if iface_names is defined and iface_names.get('json') else (iface_names.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interface-names.json"
       delegate_to: localhost
 
-    # ── Firewall rules ──
-    - name: Firewall rules
-      ansible.builtin.raw: |
-        echo "=== FILTER RULES ==="
-        pfctl -sr 2>/dev/null || echo "pfctl not available"
-        echo "=== ANCHORS ==="
-        pfctl -sA 2>/dev/null || true
-      register: fw_rules
+    # ── Firewall rules via API ──
+    - name: Firewall filter rules
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/firewall/filter/searchRule"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: fw_filter
+      ignore_errors: yes
 
-    - name: Save firewall rules
+    - name: Save firewall filter rules
       ansible.builtin.copy:
-        content: "{{ fw_rules.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/03-firewall-rules.txt"
+        content: "{{ fw_filter.json if fw_filter is defined and fw_filter.get('json') else (fw_filter.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-firewall-rules.json"
       delegate_to: localhost
 
-    # ── NAT rules ──
+    # ── NAT rules via API ──
     - name: NAT rules
-      ansible.builtin.raw: |
-        echo "=== NAT RULES ==="
-        pfctl -sn 2>/dev/null || echo "pfctl not available"
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/firewall/nat/searchRule"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
       register: nat_rules
+      ignore_errors: yes
 
     - name: Save NAT rules
       ansible.builtin.copy:
-        content: "{{ nat_rules.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/04-nat-rules.txt"
+        content: "{{ nat_rules.json if nat_rules is defined and nat_rules.get('json') else (nat_rules.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-nat-rules.json"
       delegate_to: localhost
 
-    # ── Routing ──
-    - name: Routing table
-      ansible.builtin.raw: |
-        echo "=== ROUTING TABLE ==="
-        netstat -rn
-        echo "=== DEFAULT GATEWAY ==="
-        route -n show default 2>/dev/null || route get default 2>/dev/null || echo "not found"
-      register: routing
+    # ── Routing / gateways via API ──
+    - name: Gateway status
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/routes/gateway/status"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: gateways
+      ignore_errors: yes
 
-    - name: Save routing table
+    - name: Save gateway status
       ansible.builtin.copy:
-        content: "{{ routing.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/05-routing.txt"
+        content: "{{ gateways.json if gateways is defined and gateways.get('json') else (gateways.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-gateways.json"
       delegate_to: localhost
 
-    # ── VLANs (parent interface config) ──
-    - name: VLAN interfaces
-      ansible.builtin.raw: |
-        echo "=== VLAN INTERFACES ==="
-        ifconfig | grep -E '^[a-z]+\.[0-9]+:|^vlan[0-9]+:' || echo "No VLAN interfaces found"
-        echo "=== NICS ==="
-        pciconf -lv 2>/dev/null | grep -E '(igb|em|ix|re|vtnet)' | head -20 || echo "pciconf not available"
-      register: vlans
+    # ── DHCP via API ──
+    - name: DHCP leases
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/dhcpd/leases"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: dhcp
+      ignore_errors: yes
 
-    - name: Save VLAN info
+    - name: Save DHCP leases
       ansible.builtin.copy:
-        content: "{{ vlans.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/06-vlans.txt"
+        content: "{{ dhcp.json if dhcp is defined and dhcp.get('json') else (dhcp.content | default('API call failed')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-dhcp-leases.json"
       delegate_to: localhost
 
-    # ── Full config.xml (authoritative source of truth) ──
+    # ── Full config.xml download via API ──
     - name: Full OPNsense configuration
-      ansible.builtin.raw: cat /conf/config.xml
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/config/download"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
       register: config_xml
+      ignore_errors: yes
 
     - name: Save config.xml
       ansible.builtin.copy:
-        content: "{{ config_xml.stdout }}"
+        content: "{{ config_xml.content | default('API call failed') }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/07-config.xml"
-      delegate_to: localhost
-
-    # ── DHCP ──
-    - name: DHCP configuration
-      ansible.builtin.raw: |
-        echo "=== DHCPD CONFIG ==="
-        cat /usr/local/etc/dhcpd.conf 2>/dev/null | head -200 || echo "dhcpd.conf not found"
-        echo "=== DHCP LEASES ==="
-        cat /var/db/dhcpd.leases 2>/dev/null | tail -100 || echo "lease file not found"
-      register: dhcp
-
-    - name: Save DHCP config
-      ansible.builtin.copy:
-        content: "{{ dhcp.stdout }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/08-dhcp.txt"
       delegate_to: localhost
 
     # ── Summary ──
