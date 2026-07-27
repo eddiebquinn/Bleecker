@@ -200,10 +200,10 @@
       run_once: true
       changed_when: false
 
-    # ── System info via API ──
-    - name: System information
+    # ── System info via API (OPNsense 24.x API) ──
+    - name: System status
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/core/system/info"
+        url: "https://{{ opn_host }}/api/core/system/status"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
@@ -213,28 +213,45 @@
 
     - name: Save system info
       ansible.builtin.copy:
-        content: "{{ system_info.json if system_info is defined and system_info.get('json') else (system_info.content | default('API call failed')) }}"
+        content: "{{ system_info.json if system_info is defined and system_info.get('json') else (system_info.content | default('Endpoint not available')) }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.json"
       delegate_to: localhost
 
-    # ── Interfaces via API ──
-    - name: Interface names
+    # ── Full config.xml via API /core/config/get ──
+    - name: Full OPNsense configuration (JSON)
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceNames"
+        url: "https://{{ opn_host }}/api/core/config/get"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
         validate_certs: no
-      register: iface_names
+      register: config_json
       ignore_errors: yes
 
-    - name: Save interface names
+    - name: Save config.json
       ansible.builtin.copy:
-        content: "{{ iface_names.json if iface_names is defined and iface_names.get('json') else (iface_names.content | default('API call failed')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interface-names.json"
+        content: "{{ config_json.json if config_json is defined and config_json.get('json') else (config_json.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-config.json"
       delegate_to: localhost
 
-    # ── Firewall rules via API ──
+    # ── Interfaces via diagnostics API ──
+    - name: Interface statistics
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceStatistics"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: iface_stats
+      ignore_errors: yes
+
+    - name: Save interface stats
+      ansible.builtin.copy:
+        content: "{{ iface_stats.json if iface_stats is defined and iface_stats.get('json') else (iface_stats.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-interfaces.json"
+      delegate_to: localhost
+
+    # ── Firewall rules via API (POST required for searchRule) ──
     - name: Firewall filter rules
       ansible.builtin.uri:
         url: "https://{{ opn_host }}/api/firewall/filter/searchRule"
@@ -242,16 +259,17 @@
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
         validate_certs: no
+        method: POST
       register: fw_filter
       ignore_errors: yes
 
     - name: Save firewall filter rules
       ansible.builtin.copy:
-        content: "{{ fw_filter.json if fw_filter is defined and fw_filter.get('json') else (fw_filter.content | default('API call failed')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/03-firewall-rules.json"
+        content: "{{ fw_filter.json if fw_filter is defined and fw_filter.get('json') else (fw_filter.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-firewall-rules.json"
       delegate_to: localhost
 
-    # ── NAT rules via API ──
+    # ── NAT rules via API (POST) ──
     - name: NAT rules
       ansible.builtin.uri:
         url: "https://{{ opn_host }}/api/firewall/nat/searchRule"
@@ -259,64 +277,48 @@
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
         validate_certs: no
+        method: POST
       register: nat_rules
       ignore_errors: yes
 
     - name: Save NAT rules
       ansible.builtin.copy:
-        content: "{{ nat_rules.json if nat_rules is defined and nat_rules.get('json') else (nat_rules.content | default('API call failed')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/04-nat-rules.json"
+        content: "{{ nat_rules.json if nat_rules is defined and nat_rules.get('json') else (nat_rules.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-nat-rules.json"
       delegate_to: localhost
 
-    # ── Routing / gateways via API ──
-    - name: Gateway status
+    # ── Backup Download (full config.xml) via OPNsense backup API ──
+    - name: Config backup download
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/routes/gateway/status"
+        url: "https://{{ opn_host }}/api/core/backup/download"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
         validate_certs: no
-      register: gateways
+      register: config_backup
       ignore_errors: yes
 
-    - name: Save gateway status
+    - name: Save config.xml (from backup)
       ansible.builtin.copy:
-        content: "{{ gateways.json if gateways is defined and gateways.get('json') else (gateways.content | default('API call failed')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/05-gateways.json"
+        content: "{{ config_backup.content | default('Endpoint not available') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-config.xml"
       delegate_to: localhost
 
-    # ── DHCP via API ──
-    - name: DHCP leases
+    # ── System firmware info ──
+    - name: Firmware / version info
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/dhcpd/leases"
+        url: "https://{{ opn_host }}/api/core/firmware/info"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
         validate_certs: no
-      register: dhcp
+      register: firmware
       ignore_errors: yes
 
-    - name: Save DHCP leases
+    - name: Save firmware info
       ansible.builtin.copy:
-        content: "{{ dhcp.json if dhcp is defined and dhcp.get('json') else (dhcp.content | default('API call failed')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/06-dhcp-leases.json"
-      delegate_to: localhost
-
-    # ── Full config.xml download via API ──
-    - name: Full OPNsense configuration
-      ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/core/config/download"
-        url_username: "{{ opn_api_key }}"
-        url_password: "{{ opn_api_secret }}"
-        force_basic_auth: yes
-        validate_certs: no
-      register: config_xml
-      ignore_errors: yes
-
-    - name: Save config.xml
-      ansible.builtin.copy:
-        content: "{{ config_xml.content | default('API call failed') }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/07-config.xml"
+        content: "{{ firmware.json if firmware is defined and firmware.get('json') else (firmware.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/07-firmware.json"
       delegate_to: localhost
 
     # ── Summary ──
