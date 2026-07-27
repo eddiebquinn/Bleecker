@@ -83,7 +83,6 @@ ansible-network-dry-run:
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
     - chmod 600 ~/.ssh/ci_network_key
     - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
-    - pip install paramiko -q
     - export OPNSENSE_SEMAPHORE_KEY
     - export OPNSENSE_SEMAPHORE_SECRET
   script:
@@ -106,7 +105,6 @@ ansible-network-discover-state:
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
     - chmod 600 ~/.ssh/ci_network_key
     - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
-    - pip install paramiko -q
     - export OPNSENSE_SEMAPHORE_KEY
     - export OPNSENSE_SEMAPHORE_SECRET
   script:
