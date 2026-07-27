@@ -217,24 +217,7 @@
         dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.json"
       delegate_to: localhost
 
-    # ── Full config.xml via API /core/config/get ──
-    - name: Full OPNsense configuration (JSON)
-      ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/core/config/get"
-        url_username: "{{ opn_api_key }}"
-        url_password: "{{ opn_api_secret }}"
-        force_basic_auth: yes
-        validate_certs: no
-      register: config_json
-      ignore_errors: yes
-
-    - name: Save config.json
-      ansible.builtin.copy:
-        content: "{{ config_json.json if config_json is defined and config_json.get('json') else (config_json.content | default('Endpoint not available')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/02-config.json"
-      delegate_to: localhost
-
-    # ── Interfaces via diagnostics API ──
+    # ── Full config.xml via backup/restore API ──
     - name: Interface statistics
       ansible.builtin.uri:
         url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceStatistics"
@@ -288,9 +271,25 @@
       delegate_to: localhost
 
     # ── Config backup via API ──
-    - name: Config backup list
+    - name: Backup providers
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/core/backup/list"
+        url: "https://{{ opn_host }}/api/core/backup/providers"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: backup_providers
+      ignore_errors: yes
+
+    - name: Save backup provider info
+      ansible.builtin.copy:
+        content: "{{ backup_providers.json if backup_providers is defined and backup_providers.get('json') else (backup_providers.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-backup-providers.json"
+      delegate_to: localhost
+
+    - name: Download latest config backup
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/backup/download/system"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
@@ -298,10 +297,10 @@
       register: config_backup
       ignore_errors: yes
 
-    - name: Save config backup info
+    - name: Save config.xml
       ansible.builtin.copy:
-        content: "{{ config_backup.json if config_backup is defined and config_backup.get('json') else (config_backup.content | default('Endpoint not available')) }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/06-backup-info.json"
+        content: "{{ config_backup.content | default('Endpoint not available') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-config.xml"
       delegate_to: localhost
 
     # ── System firmware info ──
