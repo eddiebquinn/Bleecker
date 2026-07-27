@@ -50,6 +50,7 @@
         commands:
           - /interface print detail
           - /interface bridge port print detail
+        timeout: 120
       register: interfaces
 
     - name: Save interfaces
@@ -76,6 +77,7 @@
       community.routeros.command:
         commands:
           - /ip route print detail
+        timeout: 120
       register: routes
 
     - name: Save routes
@@ -103,6 +105,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter print detail
+        timeout: 120
       register: fw_filter
 
     - name: Save firewall filter
@@ -115,6 +118,7 @@
       community.routeros.command:
         commands:
           - /ip firewall nat print detail
+        timeout: 120
       register: fw_nat
 
     - name: Save firewall NAT
@@ -127,6 +131,7 @@
       community.routeros.command:
         commands:
           - /ip firewall mangle print detail
+        timeout: 120
       register: fw_mangle
 
     - name: Save firewall mangle
