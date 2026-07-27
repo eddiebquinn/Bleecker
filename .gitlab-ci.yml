@@ -64,12 +64,11 @@ variables:
 
 ansible-network-validate:
   <<: *default_ansible_job
+  <<: *rules_validate
   stage: validate
-  rules:
-    - when: manual
-      allow_failure: true
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml --syntax-check
 
 ansible-network-dry-run:
   <<: *default_ansible_job
