@@ -105,6 +105,7 @@ ansible-network-discover-state:
     - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
     - chmod 600 ~/.ssh/ci_network_key
     - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
+    - ssh-keyscan -T 5 -H 10.67.45.2 10.67.45.1 >> .ansible/known_hosts 2>/dev/null || true
     - export OPNSENSE_SEMAPHORE_KEY
     - export OPNSENSE_SEMAPHORE_SECRET
   script:
