@@ -45,17 +45,44 @@
       delegate_to: localhost
 
     # ── Interfaces ──
-    - name: All interfaces
+    # Split into per-type dumps — /interface print detail for all 50+ ports
+    # via SSH/paramiko is too slow. Per-type dumps are smaller and faster.
+    - name: Interface summary (all types)
       community.routeros.command:
         commands:
-          - /interface print detail
-          - /interface bridge port print detail
-      register: interfaces
+          - /interface print
+      register: iface_summary
 
-    - name: Save interfaces
+    - name: Save interface summary
       ansible.builtin.copy:
-        content: "{{ interfaces.stdout | join('\n\n======\n\n') }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interfaces.txt"
+        content: "{{ iface_summary.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interface-summary.txt"
+      delegate_to: localhost
+
+    - name: Ethernet interfaces detail
+      community.routeros.command:
+        commands:
+          - /interface ethernet print detail
+      register: iface_eth
+
+    - name: Save ethernet detail
+      ansible.builtin.copy:
+        content: "{{ iface_eth.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-interface-ethernet.txt"
+      delegate_to: localhost
+
+    - name: Bridge and VLAN interfaces
+      community.routeros.command:
+        commands:
+          - /interface bridge print detail
+          - /interface vlan print detail
+          - /interface bridge port print detail
+      register: iface_bridge
+
+    - name: Save bridge/VLAN detail
+      ansible.builtin.copy:
+        content: "{{ iface_bridge.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-interface-bridge-vlan.txt"
       delegate_to: localhost
 
     # ── IP addresses ──
