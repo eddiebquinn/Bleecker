@@ -3,3 +3,5 @@
 ansible_connection: ansible.netcommon.network_cli
 ansible_network_os: community.routeros.routeros
 ansible_user: semaphore-agent
+# /interface print detail on a CRS328 with 50+ ports exceeds the default 30s
+ansible_persistent_command_timeout: 120
