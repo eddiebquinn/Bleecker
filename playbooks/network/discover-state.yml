@@ -1,0 +1,304 @@
+---
+# discover-state.yml — Read-only baseline discovery for Argus Phase 1.1
+#
+# Captures the current state of both network devices (gridlink-1 RouterOS
+# CRS328, blackice-1 OPNsense) so we can design the L3 routing Ansible role
+# against known starting state.
+#
+# This playbook writes NOTHING to the devices. All tasks are information-
+# gathering only. Output is saved to discovered-state/ for download via CI
+# artifacts.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml
+#
+# In CI: triggered manually via ansible-network-discover-state job.
+
+- name: Discover RouterOS state — gridlink-1
+  hosts: routeros_switches
+  gather_facts: no
+  vars:
+    output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+
+  tasks:
+    - name: Create output directory
+      ansible.builtin.file:
+        path: "{{ output_base }}/{{ inventory_hostname }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    # ── System identity and version ──
+    - name: System identity and resources
+      community.routeros.command:
+        commands:
+          - /system identity print
+          - /system resource print
+          - /system license print
+      register: system_info
+
+    - name: Save system info
+      ansible.builtin.copy:
+        content: "{{ system_info.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.txt"
+      delegate_to: localhost
+
+    # ── Interfaces ──
+    - name: All interfaces
+      community.routeros.command:
+        commands:
+          - /interface print detail
+          - /interface bridge port print detail
+      register: interfaces
+
+    - name: Save interfaces
+      ansible.builtin.copy:
+        content: "{{ interfaces.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interfaces.txt"
+      delegate_to: localhost
+
+    # ── IP addresses ──
+    - name: IP addresses
+      community.routeros.command:
+        commands:
+          - /ip address print detail
+      register: ip_addresses
+
+    - name: Save IP addresses
+      ansible.builtin.copy:
+        content: "{{ ip_addresses.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-ip-addresses.txt"
+      delegate_to: localhost
+
+    # ── Routing table ──
+    - name: Routes
+      community.routeros.command:
+        commands:
+          - /ip route print detail
+      register: routes
+
+    - name: Save routes
+      ansible.builtin.copy:
+        content: "{{ routes.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-routes.txt"
+      delegate_to: localhost
+
+    # ── VLANs ──
+    - name: VLAN configuration
+      community.routeros.command:
+        commands:
+          - /interface bridge vlan print detail
+          - /interface vlan print detail
+      register: vlans
+
+    - name: Save VLAN config
+      ansible.builtin.copy:
+        content: "{{ vlans.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-vlans.txt"
+      delegate_to: localhost
+
+    # ── Firewall rules ──
+    - name: Firewall filter rules
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print detail
+      register: fw_filter
+
+    - name: Save firewall filter
+      ansible.builtin.copy:
+        content: "{{ fw_filter.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-firewall-filter.txt"
+      delegate_to: localhost
+
+    - name: Firewall NAT rules
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print detail
+      register: fw_nat
+
+    - name: Save firewall NAT
+      ansible.builtin.copy:
+        content: "{{ fw_nat.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/07-firewall-nat.txt"
+      delegate_to: localhost
+
+    - name: Firewall mangle rules
+      community.routeros.command:
+        commands:
+          - /ip firewall mangle print detail
+      register: fw_mangle
+
+    - name: Save firewall mangle
+      ansible.builtin.copy:
+        content: "{{ fw_mangle.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/08-firewall-mangle.txt"
+      delegate_to: localhost
+
+    # ── OSPF ──
+    - name: OSPF configuration and neighbors
+      community.routeros.command:
+        commands:
+          - /routing ospf neighbor print detail
+          - /routing ospf network print detail
+      register: ospf
+
+    - name: Save OSPF state
+      ansible.builtin.copy:
+        content: "{{ ospf.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/09-ospf.txt"
+      delegate_to: localhost
+
+    # ── Neighbour discovery (LLDP/ CDP) ──
+    - name: Neighbour discovery
+      community.routeros.command:
+        commands:
+          - /ip neighbor discovery print detail
+      register: neighbors
+
+    - name: Save neighbour info
+      ansible.builtin.copy:
+        content: "{{ neighbors.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/10-neighbors.txt"
+      delegate_to: localhost
+
+    # ── Summary ──
+    - name: Summary of discovered state
+      ansible.builtin.debug:
+        msg: "State captured for {{ inventory_hostname }} — {{ output_base }}/{{ inventory_hostname }}/"
+
+
+- name: Discover OPNsense state — blackice-1
+  hosts: opnsense_firewalls
+  gather_facts: no
+  vars:
+    output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+
+  tasks:
+    - name: Create output directory
+      ansible.builtin.file:
+        path: "{{ output_base }}/{{ inventory_hostname }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    # ── System info ──
+    - name: System information
+      ansible.builtin.raw: |
+        uname -a
+        echo "=== VERSION ==="
+        cat /usr/local/opnsense/version/opnsense.txt 2>/dev/null || echo "not found"
+        echo "=== UPTIME ==="
+        uptime
+      register: system_info
+
+    - name: Save system info
+      ansible.builtin.copy:
+        content: "{{ system_info.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.txt"
+      delegate_to: localhost
+
+    # ── Interfaces ──
+    - name: Interface configuration
+      ansible.builtin.raw: |
+        ifconfig
+        echo "=== INTERFACE ASSIGNMENTS ==="
+        cat /conf/opnsense.xml 2>/dev/null | grep -A1 '<interface>' || echo "not found in /conf/opnsense.xml"
+      register: interfaces
+
+    - name: Save interfaces
+      ansible.builtin.copy:
+        content: "{{ interfaces.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interfaces.txt"
+      delegate_to: localhost
+
+    # ── Firewall rules ──
+    - name: Firewall rules
+      ansible.builtin.raw: |
+        echo "=== FILTER RULES ==="
+        pfctl -sr 2>/dev/null || echo "pfctl not available"
+        echo "=== ANCHORS ==="
+        pfctl -sA 2>/dev/null || true
+      register: fw_rules
+
+    - name: Save firewall rules
+      ansible.builtin.copy:
+        content: "{{ fw_rules.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-firewall-rules.txt"
+      delegate_to: localhost
+
+    # ── NAT rules ──
+    - name: NAT rules
+      ansible.builtin.raw: |
+        echo "=== NAT RULES ==="
+        pfctl -sn 2>/dev/null || echo "pfctl not available"
+      register: nat_rules
+
+    - name: Save NAT rules
+      ansible.builtin.copy:
+        content: "{{ nat_rules.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-nat-rules.txt"
+      delegate_to: localhost
+
+    # ── Routing ──
+    - name: Routing table
+      ansible.builtin.raw: |
+        echo "=== ROUTING TABLE ==="
+        netstat -rn
+        echo "=== DEFAULT GATEWAY ==="
+        route -n show default 2>/dev/null || route get default 2>/dev/null || echo "not found"
+      register: routing
+
+    - name: Save routing table
+      ansible.builtin.copy:
+        content: "{{ routing.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-routing.txt"
+      delegate_to: localhost
+
+    # ── VLANs (parent interface config) ──
+    - name: VLAN interfaces
+      ansible.builtin.raw: |
+        echo "=== VLAN INTERFACES ==="
+        ifconfig | grep -E '^[a-z]+\.[0-9]+:|^vlan[0-9]+:' || echo "No VLAN interfaces found"
+        echo "=== NICS ==="
+        pciconf -lv 2>/dev/null | grep -E '(igb|em|ix|re|vtnet)' | head -20 || echo "pciconf not available"
+      register: vlans
+
+    - name: Save VLAN info
+      ansible.builtin.copy:
+        content: "{{ vlans.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-vlans.txt"
+      delegate_to: localhost
+
+    # ── Full config.xml (authoritative source of truth) ──
+    - name: Full OPNsense configuration
+      ansible.builtin.raw: cat /conf/config.xml
+      register: config_xml
+      # config.xml can be large; this is the single authoritative doc
+
+    - name: Save config.xml
+      ansible.builtin.copy:
+        content: "{{ config_xml.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/07-config.xml"
+      delegate_to: localhost
+
+    # ── DHCP ──
+    - name: DHCP configuration
+      ansible.builtin.raw: |
+        echo "=== DHCPD CONFIG ==="
+        cat /usr/local/etc/dhcpd.conf 2>/dev/null | head -200 || echo "dhcpd.conf not found"
+        echo "=== DHCP LEASES ==="
+        cat /var/db/dhcpd.leases 2>/dev/null | tail -100 || echo "lease file not found"
+      register: dhcp
+
+    - name: Save DHCP config
+      ansible.builtin.copy:
+        content: "{{ dhcp.stdout }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/08-dhcp.txt"
+      delegate_to: localhost
+
+    # ── Summary ──
+    - name: Summary of discovered state
+      ansible.builtin.debug:
+        msg: "State captured for {{ inventory_hostname }} — {{ output_base }}/{{ inventory_hostname }}/"
