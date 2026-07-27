@@ -272,7 +272,7 @@
     # ── NAT rules via API (POST) ──
     - name: NAT rules
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/firewall/nat/searchRule"
+        url: "https://{{ opn_host }}/api/firewall/d_nat/searchRule"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
@@ -287,10 +287,10 @@
         dest: "{{ output_base }}/{{ inventory_hostname }}/05-nat-rules.json"
       delegate_to: localhost
 
-    # ── Backup Download (full config.xml) via OPNsense backup API ──
-    - name: Config backup download
+    # ── Config backup via API ──
+    - name: Config backup list
       ansible.builtin.uri:
-        url: "https://{{ opn_host }}/api/core/backup/download"
+        url: "https://{{ opn_host }}/api/core/backup/list"
         url_username: "{{ opn_api_key }}"
         url_password: "{{ opn_api_secret }}"
         force_basic_auth: yes
@@ -298,10 +298,10 @@
       register: config_backup
       ignore_errors: yes
 
-    - name: Save config.xml (from backup)
+    - name: Save config backup info
       ansible.builtin.copy:
-        content: "{{ config_backup.content | default('Endpoint not available') }}"
-        dest: "{{ output_base }}/{{ inventory_hostname }}/06-config.xml"
+        content: "{{ config_backup.json if config_backup is defined and config_backup.get('json') else (config_backup.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-backup-info.json"
       delegate_to: localhost
 
     # ── System firmware info ──
