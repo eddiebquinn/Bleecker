@@ -17,7 +17,6 @@
 - name: Discover RouterOS state — gridlink-1
   hosts: routeros_switches
   gather_facts: no
-  connection: ansible.builtin.ssh
   vars:
     output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
 
@@ -32,126 +31,145 @@
 
     # ── System identity and version ──
     - name: System identity and resources
-      ansible.builtin.raw: |
-        /system identity print
-        /system resource print
-        /system license print
+      community.routeros.command:
+        commands:
+          - /system identity print
+          - /system resource print
+          - /system license print
       register: system_info
 
     - name: Save system info
       ansible.builtin.copy:
-        content: "{{ system_info.stdout }}"
+        content: "{{ system_info.stdout | join('\n\n======\n\n') }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.txt"
       delegate_to: localhost
 
     # ── Interfaces ──
     - name: Interface summary
-      ansible.builtin.raw: /interface print
+      community.routeros.command:
+        commands:
+          - /interface print without-paging
       register: iface_summary
 
     - name: Save interface summary
       ansible.builtin.copy:
-        content: "{{ iface_summary.stdout }}"
+        content: "{{ iface_summary.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/02-interface-summary.txt"
       delegate_to: localhost
 
     - name: Ethernet interfaces detail
-      ansible.builtin.raw: /interface ethernet print detail
+      community.routeros.command:
+        commands:
+          - /interface ethernet print detail without-paging
       register: iface_eth
 
     - name: Save ethernet detail
       ansible.builtin.copy:
-        content: "{{ iface_eth.stdout }}"
+        content: "{{ iface_eth.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/03-interface-ethernet.txt"
       delegate_to: localhost
 
-    - name: Bridge, VLAN, and bridge port config
-      ansible.builtin.raw: |
-        /interface bridge print detail
-        /interface vlan print detail
-        /interface bridge port print detail
+    - name: Bridge and VLAN interfaces
+      community.routeros.command:
+        commands:
+          - /interface bridge print detail without-paging
+          - /interface vlan print detail without-paging
+          - /interface bridge port print detail without-paging
       register: iface_bridge
 
     - name: Save bridge/VLAN detail
       ansible.builtin.copy:
-        content: "{{ iface_bridge.stdout }}"
+        content: "{{ iface_bridge.stdout | join('\n\n======\n\n') }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/04-interface-bridge-vlan.txt"
       delegate_to: localhost
 
     # ── IP addresses ──
     - name: IP addresses
-      ansible.builtin.raw: /ip address print detail
+      community.routeros.command:
+        commands:
+          - /ip address print detail without-paging
       register: ip_addresses
 
     - name: Save IP addresses
       ansible.builtin.copy:
-        content: "{{ ip_addresses.stdout }}"
+        content: "{{ ip_addresses.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/05-ip-addresses.txt"
       delegate_to: localhost
 
     # ── Routing table ──
     - name: Routes
-      ansible.builtin.raw: /ip route print detail
+      community.routeros.command:
+        commands:
+          - /ip route print detail without-paging
       register: routes
 
     - name: Save routes
       ansible.builtin.copy:
-        content: "{{ routes.stdout }}"
+        content: "{{ routes.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/06-routes.txt"
       delegate_to: localhost
 
     # ── Firewall rules ──
     - name: Firewall filter rules
-      ansible.builtin.raw: /ip firewall filter print detail
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print detail without-paging
       register: fw_filter
 
     - name: Save firewall filter
       ansible.builtin.copy:
-        content: "{{ fw_filter.stdout }}"
+        content: "{{ fw_filter.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/07-firewall-filter.txt"
       delegate_to: localhost
 
     - name: Firewall NAT rules
-      ansible.builtin.raw: /ip firewall nat print detail
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print detail without-paging
       register: fw_nat
 
     - name: Save firewall NAT
       ansible.builtin.copy:
-        content: "{{ fw_nat.stdout }}"
+        content: "{{ fw_nat.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/08-firewall-nat.txt"
       delegate_to: localhost
 
     - name: Firewall mangle rules
-      ansible.builtin.raw: /ip firewall mangle print detail
+      community.routeros.command:
+        commands:
+          - /ip firewall mangle print detail without-paging
       register: fw_mangle
 
     - name: Save firewall mangle
       ansible.builtin.copy:
-        content: "{{ fw_mangle.stdout }}"
+        content: "{{ fw_mangle.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/09-firewall-mangle.txt"
       delegate_to: localhost
 
     # ── OSPF ──
     - name: OSPF configuration and neighbors
-      ansible.builtin.raw: |
-        /routing ospf neighbor print detail
-        /routing ospf network print detail
+      community.routeros.command:
+        commands:
+          - /routing ospf neighbor print detail without-paging
+          - /routing ospf network print detail without-paging
       register: ospf
 
     - name: Save OSPF state
       ansible.builtin.copy:
-        content: "{{ ospf.stdout }}"
+        content: "{{ ospf.stdout | join('\n\n======\n\n') }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/10-ospf.txt"
       delegate_to: localhost
 
     # ── Neighbour discovery (LLDP) ──
     - name: Neighbour discovery
-      ansible.builtin.raw: /ip neighbor discovery print detail
+      community.routeros.command:
+        commands:
+          - /ip neighbor discovery print detail without-paging
       register: neighbors
 
     - name: Save neighbour info
       ansible.builtin.copy:
-        content: "{{ neighbors.stdout }}"
+        content: "{{ neighbors.stdout[0] }}"
         dest: "{{ output_base }}/{{ inventory_hostname }}/11-neighbors.txt"
       delegate_to: localhost
 
@@ -268,7 +286,6 @@
     - name: Full OPNsense configuration
       ansible.builtin.raw: cat /conf/config.xml
       register: config_xml
-      # config.xml can be large; this is the single authoritative doc
 
     - name: Save config.xml
       ansible.builtin.copy:
