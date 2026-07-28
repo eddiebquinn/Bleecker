@@ -72,8 +72,22 @@ ansible-network-validate:
 
 ansible-network-dry-run:
   <<: *default_ssh_ansible_job
-  <<: *rules_test
   stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - playbooks/network/**/*
+        - roles/routeros_l3_switch/**/*
+        - roles/opnsense_firewall/**/*
+        - inventory/group_vars/network_devices.yml
+        - inventory/group_vars/routeros_switches.yml
+        - inventory/group_vars/opnsense_firewalls.yml
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   before_script:
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - mkdir -p ~/.ssh .ansible
@@ -169,8 +183,34 @@ ansible-discover-network-flows:
 
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
-  <<: *rules_test
   stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - site.yml
+        - playbooks/lifecycle/**/*
+        - playbooks/deploy/**/*
+        - playbooks/discovery/**/*
+        - roles/compose_repo_deploy/**/*
+        - roles/docker_*/**/*
+        - roles/users/**/*
+        - roles/ssh_hardening/**/*
+        - roles/motd_dynamic/**/*
+        - roles/apt_timers/**/*
+        - roles/k3s_agent_user/**/*
+        - roles/komodo_deploy/**/*
+        - inventory/group_vars/*.yml
+        - inventory/hosts.yml
+        - .ci/**/*
+        - ansible.cfg
+        - .gitlab-ci.yml
+        - requirements.yml
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
