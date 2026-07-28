@@ -70,7 +70,7 @@
 # ── 4. NAT Rule Verification ──
 - name: Fetch current NAT rules
   ansible.builtin.uri:
-    url: "https://{{ opn_host }}/api/firewall/nat/searchRule"
+    url: "https://{{ opn_api_host }}/api/firewall/nat/searchRule"
     url_username: "{{ opn_api_key }}"
     url_password: "{{ opn_api_secret }}"
     force_basic_auth: yes
@@ -84,7 +84,7 @@
 # ── 5. Interface Verification ──
 - name: Fetch interface statistics
   ansible.builtin.uri:
-    url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceStatistics"
+    url: "https://{{ opn_api_host }}/api/diagnostics/interface/getInterfaceStatistics"
     url_username: "{{ opn_api_key }}"
     url_password: "{{ opn_api_secret }}"
     force_basic_auth: yes
