@@ -13,6 +13,14 @@ stages:
   - discover
   - apply
 
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+
 variables:
   ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:e7564ee6"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
