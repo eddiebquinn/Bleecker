@@ -79,7 +79,7 @@ ansible-network-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml --syntax-check
 
 ansible-network-dry-run:
-  <<: *default_ansible_job
+  <<: *default_ssh_ansible_job
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -91,8 +91,11 @@ ansible-network-dry-run:
         - inventory/group_vars/routeros_switches.yml
         - inventory/group_vars/opnsense_firewalls.yml
       when: on_success
-    - when: manual
-      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   before_script:
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - mkdir -p ~/.ssh .ansible
@@ -195,6 +198,7 @@ ansible-dry-run-lifecycle:
         - site.yml
         - playbooks/lifecycle/**/*
         - playbooks/deploy/**/*
+        - playbooks/discovery/**/*
         - roles/compose_repo_deploy/**/*
         - roles/docker_*/**/*
         - roles/users/**/*
@@ -205,10 +209,16 @@ ansible-dry-run-lifecycle:
         - roles/komodo_deploy/**/*
         - inventory/group_vars/*.yml
         - inventory/hosts.yml
+        - .ci/**/*
         - ansible.cfg
+        - .gitlab-ci.yml
+        - requirements.yml
       when: on_success
-    - when: manual
-      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'

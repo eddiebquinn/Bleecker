@@ -1,3 +1,8 @@
 ---
-# Handlers for RouterOS config changes
-# TODO: add commit handlers after config changes
+# Handlers for routeros_l3_switch
+#
+# RouterOS applies changes immediately — there is no commit/confirm model
+# like some other network OSes. These handlers exist for future use with
+# RouterOS scripts or notification patterns.
+#
+# Currently a placeholder — no handlers are needed for direct CLI commands.
