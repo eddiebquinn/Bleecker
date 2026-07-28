@@ -1,5 +1,4 @@
 ---
-# Network configuration — triggers ansible-network-dry-run via rules:changes
 - name: Configure RouterOS switches
   hosts: routeros_switches
   gather_facts: no
