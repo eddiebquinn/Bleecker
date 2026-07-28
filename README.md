@@ -43,6 +43,9 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   │   ├── monitoring-stack.yml   # core/exporter split
 │   │   ├── pangolin.yml           # core/periphery + multi-env
 │   │   └── (26 thin wrappers)     # 3-line import_playbook each
+│   ├── network/
+│   │   ├── site.yml               # network device config site play
+│   │   └── discover-state.yml     # read-only baseline discovery
 │   └── discovery/
 │       ├── docker-state.yml
 │       └── network-flows.yml
@@ -54,7 +57,9 @@ The design goal is reproducibility, idempotency, and clean separation of concern
 │   ├── docker_prep/
 │   ├── k3s_agent_user/
 │   ├── komodo_deploy/
-│   └── compose_repo_deploy/
+│   ├── compose_repo_deploy/
+│   ├── routeros_l3_switch/        # CRS328 switch management (Argus Phase 1.1)
+│   └── opnsense_firewall/         # blackice-1 firewall management
 ├── flake.nix
 ├── flake.lock
 ├── .envrc
@@ -229,6 +234,18 @@ Runs syntax checks against the main playbooks on:
 
 This catches YAML, playbook, and role wiring errors without contacting any remote hosts.
 
+### `ansible-network-validate`
+
+Runs syntax checks against the network playbooks (`playbooks/network/`) automatically on MRs and default branch pushes. Same pattern as `ansible-validate` but scoped to network device configuration.
+
+### `ansible-network-discover-state`
+
+Manual job that runs `playbooks/network/discover-state.yml` — a read-only baseline discovery of both network devices. Exports `discovered-state/` as CI artifacts with captured interface, routing, firewall, VLAN, and system data.
+
+### `ansible-network-dry-run`
+
+Manual job that runs `playbooks/network/site.yml --check --diff` against both network devices. Requires network SSH key and OPNsense API credentials.
+
 ### `ansible-detect-provision-state`
 
 Runs `playbooks/lifecycle/00-detect.yml` and writes CI artifacts describing which targeted hosts are:
@@ -322,6 +339,62 @@ forks = 5
 ```
 
 This lower parallelism was chosen after CI dry-run testing showed it to be more reliable across the full managed estate, especially the k3s hosts.
+
+## Network Management
+
+Network device configuration is managed separately from the host lifecycle playbooks, under:
+
+```bash
+playbooks/network/
+```
+
+The network devices are defined in the inventory under the `network_devices` parent group with two child groups:
+
+| Group | Device | IP | Role |
+|---|---|---|---|
+| `routeros_switches` | `gridlink-1` | 10.67.45.2 | CRS328 L3 switch (Argus Phase 1.1) |
+| `opnsense_firewalls` | `blackice-1` | 10.67.45.1 | OPNsense firewall |
+
+Connection variables are scoped per group:
+
+| Group | Connection | Auth |
+|---|---|---|
+| `routeros_switches` | `ansible.netcommon.network_cli` + `community.routeros.routeros` | SSH key (`semaphore-agent`) |
+| `opnsense_firewalls` | `ansible.builtin.ssh` + FreeBSD Python | REST API (key/secret via CI vars) |
+
+### Network playbooks
+
+**`playbooks/network/site.yml`** — Configures both network devices via their respective roles:
+
+```bash
+ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml
+```
+
+**`playbooks/network/discover-state.yml`** — Read-only baseline discovery. Captures the current state of both devices for designing IaC enforcement roles:
+
+- RouterOS: interfaces, IPs, routes, VLANs, firewall rules (filter/nat/mangle), OSPF, LLDP neighbors
+- OPNsense: system status, interface statistics, firewall rules, NAT rules, firmware info, package list
+
+```bash
+ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml -v
+```
+
+### Network roles
+
+**`roles/routeros_l3_switch/`** — Manages VLAN SVIs, OSPF/static routes, ACLs, and mangle+PBR rules on the CRS328 (`gridlink-1`). This is the Argus Phase 1.1 role — content to be built from the discovered-state baseline.
+
+**`roles/opnsense_firewall/`** — Manages firewall rules, NAT rules, interface config, and aliases on `blackice-1` via the OPNsense REST API (`oxlorg.opnsense` collection).
+
+### Runner image
+
+Network device SSH connectivity requires `ansible-pylibssh` (C/libssh binding) in the runner image. The synthcoke image at `r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke` ships this dependency.
+
+### Required CI/CD variables for network jobs
+
+| Variable | Purpose |
+|---|---|
+| `OPNSENSE_SEMAPHORE_KEY` | OPNsense REST API key |
+| `OPNSENSE_SEMAPHORE_SECRET` | OPNsense REST API secret |
 
 ## Compose Deploy Playbooks
 

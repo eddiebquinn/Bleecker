@@ -14,7 +14,7 @@ stages:
   - apply
 
 variables:
-  ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:abdfca84"
+  ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:e7564ee6"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
   TARGET_HOSTS: "managed"
   DETECT_TARGETS: "managed"
@@ -64,12 +64,11 @@ variables:
 
 ansible-network-validate:
   <<: *default_ansible_job
+  <<: *rules_validate
   stage: validate
-  rules:
-    - when: manual
-      allow_failure: true
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --syntax-check
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml --syntax-check
 
 ansible-network-dry-run:
   <<: *default_ansible_job
@@ -88,6 +87,30 @@ ansible-network-dry-run:
     - export OPNSENSE_SEMAPHORE_SECRET
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml --check --diff
+
+ansible-network-discover-state:
+  <<: *default_ssh_ansible_job
+  stage: discover
+  rules:
+    - when: manual
+      allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - discovered-state/
+  before_script:
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
+    - chmod 600 ~/.ssh/ci_network_key
+    - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
+    - ssh-keyscan -T 5 -H 10.67.45.2 10.67.45.1 >> .ansible/known_hosts 2>/dev/null || true
+    - export ANSIBLE_HOST_KEY_CHECKING=false
+    - export OPNSENSE_SEMAPHORE_KEY
+    - export OPNSENSE_SEMAPHORE_SECRET
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml -v
 
 ansible-validate:
   <<: *default_ansible_job

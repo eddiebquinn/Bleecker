@@ -1,0 +1,326 @@
+---
+# discover-state.yml — Read-only baseline discovery for Argus Phase 1.1
+#
+# Captures the current state of both network devices (gridlink-1 RouterOS
+# CRS328, blackice-1 OPNsense) so we can design the L3 routing Ansible role
+# against known starting state.
+#
+# This playbook writes NOTHING to the devices. All tasks are information-
+# gathering only. Output is saved to discovered-state/ for download via CI
+# artifacts.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml
+#
+# In CI: triggered manually via ansible-network-discover-state job.
+
+- name: Discover RouterOS state — gridlink-1
+  hosts: routeros_switches
+  gather_facts: no
+  vars:
+    output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+
+  tasks:
+    - name: Create output directory
+      ansible.builtin.file:
+        path: "{{ output_base }}/{{ inventory_hostname }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    # ── System identity and version ──
+    - name: System identity and resources
+      community.routeros.command:
+        commands:
+          - /system identity print
+          - /system resource print
+          - /system license print
+      register: system_info
+
+    - name: Save system info
+      ansible.builtin.copy:
+        content: "{{ system_info.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.txt"
+      delegate_to: localhost
+
+    # ── Interfaces ──
+    - name: Interface summary
+      community.routeros.command:
+        commands:
+          - /interface print without-paging
+      register: iface_summary
+
+    - name: Save interface summary
+      ansible.builtin.copy:
+        content: "{{ iface_summary.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/02-interface-summary.txt"
+      delegate_to: localhost
+
+    - name: Ethernet interfaces detail
+      community.routeros.command:
+        commands:
+          - /interface ethernet print detail without-paging
+      register: iface_eth
+
+    - name: Save ethernet detail
+      ansible.builtin.copy:
+        content: "{{ iface_eth.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-interface-ethernet.txt"
+      delegate_to: localhost
+
+    - name: Bridge and VLAN interfaces
+      community.routeros.command:
+        commands:
+          - /interface bridge print detail without-paging
+          - /interface vlan print detail without-paging
+          - /interface bridge port print detail without-paging
+      register: iface_bridge
+
+    - name: Save bridge/VLAN detail
+      ansible.builtin.copy:
+        content: "{{ iface_bridge.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-interface-bridge-vlan.txt"
+      delegate_to: localhost
+
+    # ── IP addresses ──
+    - name: IP addresses
+      community.routeros.command:
+        commands:
+          - /ip address print detail without-paging
+      register: ip_addresses
+
+    - name: Save IP addresses
+      ansible.builtin.copy:
+        content: "{{ ip_addresses.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-ip-addresses.txt"
+      delegate_to: localhost
+
+    # ── Routing table ──
+    - name: Routes
+      community.routeros.command:
+        commands:
+          - /ip route print detail without-paging
+      register: routes
+
+    - name: Save routes
+      ansible.builtin.copy:
+        content: "{{ routes.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-routes.txt"
+      delegate_to: localhost
+
+    # ── Firewall rules ──
+    - name: Firewall filter rules
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print detail without-paging
+      register: fw_filter
+
+    - name: Save firewall filter
+      ansible.builtin.copy:
+        content: "{{ fw_filter.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/07-firewall-filter.txt"
+      delegate_to: localhost
+
+    - name: Firewall NAT rules
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print detail without-paging
+      register: fw_nat
+
+    - name: Save firewall NAT
+      ansible.builtin.copy:
+        content: "{{ fw_nat.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/08-firewall-nat.txt"
+      delegate_to: localhost
+
+    - name: Firewall mangle rules
+      community.routeros.command:
+        commands:
+          - /ip firewall mangle print detail without-paging
+      register: fw_mangle
+
+    - name: Save firewall mangle
+      ansible.builtin.copy:
+        content: "{{ fw_mangle.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/09-firewall-mangle.txt"
+      delegate_to: localhost
+
+    # ── OSPF ──
+    - name: OSPF configuration and neighbors
+      community.routeros.command:
+        commands:
+          - /routing ospf neighbor print detail without-paging
+          - /routing ospf network print detail without-paging
+      register: ospf
+
+    - name: Save OSPF state
+      ansible.builtin.copy:
+        content: "{{ ospf.stdout | join('\n\n======\n\n') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/10-ospf.txt"
+      delegate_to: localhost
+
+    # ── Neighbour discovery (LLDP) ──
+    - name: Neighbour discovery
+      community.routeros.command:
+        commands:
+          - /ip neighbor discovery print detail without-paging
+      register: neighbors
+
+    - name: Save neighbour info
+      ansible.builtin.copy:
+        content: "{{ neighbors.stdout[0] }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/11-neighbors.txt"
+      delegate_to: localhost
+
+    # ── Summary ──
+    - name: Summary of discovered state
+      ansible.builtin.debug:
+        msg: "State captured for {{ inventory_hostname }} — {{ output_base }}/{{ inventory_hostname }}/"
+
+
+- name: Discover OPNsense state — blackice-1
+  hosts: opnsense_firewalls
+  gather_facts: no
+  connection: local
+  vars:
+    # Force local execution — the OPNsense group_vars set ansible_connection: ssh
+    ansible_connection: local
+    output_base: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.', true) }}/discovered-state"
+    opn_host: "{{ hostvars['blackice-1']['ansible_host'] | default('10.67.45.1') }}"
+    opn_api_key: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_KEY') }}"
+    opn_api_secret: "{{ lookup('env', 'OPNSENSE_SEMAPHORE_SECRET') }}"
+
+  tasks:
+    - name: Create output directory
+      ansible.builtin.file:
+        path: "{{ output_base }}/{{ inventory_hostname }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    # ── System info via API (OPNsense 24.x API) ──
+    - name: System status
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/system/status"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: system_info
+      ignore_errors: yes
+
+    - name: Save system info
+      ansible.builtin.copy:
+        content: "{{ system_info.json if system_info is defined and system_info.get('json') else (system_info.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/01-system-info.json"
+      delegate_to: localhost
+
+    # ── Full config.xml via backup/restore API ──
+    - name: Interface statistics
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceStatistics"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: iface_stats
+      ignore_errors: yes
+
+    - name: Save interface stats
+      ansible.builtin.copy:
+        content: "{{ iface_stats.json if iface_stats is defined and iface_stats.get('json') else (iface_stats.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/03-interfaces.json"
+      delegate_to: localhost
+
+    # ── Firewall rules via API (POST required for searchRule) ──
+    - name: Firewall filter rules
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/firewall/filter/searchRule"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+        method: POST
+      register: fw_filter
+      ignore_errors: yes
+
+    - name: Save firewall filter rules
+      ansible.builtin.copy:
+        content: "{{ fw_filter.json if fw_filter is defined and fw_filter.get('json') else (fw_filter.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/04-firewall-rules.json"
+      delegate_to: localhost
+
+    # ── NAT rules via API (POST) ──
+    - name: NAT rules
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/firewall/d_nat/searchRule"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+        method: POST
+      register: nat_rules
+      ignore_errors: yes
+
+    - name: Save NAT rules
+      ansible.builtin.copy:
+        content: "{{ nat_rules.json if nat_rules is defined and nat_rules.get('json') else (nat_rules.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/05-nat-rules.json"
+      delegate_to: localhost
+
+    # ── Config backup via API ──
+    - name: Backup providers
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/backup/providers"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: backup_providers
+      ignore_errors: yes
+
+    - name: Save backup provider info
+      ansible.builtin.copy:
+        content: "{{ backup_providers.json if backup_providers is defined and backup_providers.get('json') else (backup_providers.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-backup-providers.json"
+      delegate_to: localhost
+
+    - name: Download latest config backup
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/backup/download/system"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: config_backup
+      ignore_errors: yes
+
+    - name: Save config.xml
+      ansible.builtin.copy:
+        content: "{{ config_backup.content | default('Endpoint not available') }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/06-config.xml"
+      delegate_to: localhost
+
+    # ── System firmware info ──
+    - name: Firmware / version info
+      ansible.builtin.uri:
+        url: "https://{{ opn_host }}/api/core/firmware/info"
+        url_username: "{{ opn_api_key }}"
+        url_password: "{{ opn_api_secret }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: firmware
+      ignore_errors: yes
+
+    - name: Save firmware info
+      ansible.builtin.copy:
+        content: "{{ firmware.json if firmware is defined and firmware.get('json') else (firmware.content | default('Endpoint not available')) }}"
+        dest: "{{ output_base }}/{{ inventory_hostname }}/07-firmware.json"
+      delegate_to: localhost
+
+    # ── Summary ──
+    - name: Summary of discovered state
+      ansible.builtin.debug:
+        msg: "State captured for {{ inventory_hostname }} — {{ output_base }}/{{ inventory_hostname }}/"
