@@ -13,6 +13,14 @@ stages:
   - discover
   - apply
 
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+
 variables:
   ANSIBLE_RUNNER_IMAGE: "r.gitlab.eddiequinn.casa/foundry/pharmex/synthcoke:e7564ee6"
   ANSIBLE_CONFIG: "$CI_PROJECT_DIR/ansible.cfg"
@@ -74,6 +82,15 @@ ansible-network-dry-run:
   <<: *default_ansible_job
   stage: test
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - playbooks/network/**/*
+        - roles/routeros_l3_switch/**/*
+        - roles/opnsense_firewall/**/*
+        - inventory/group_vars/network_devices.yml
+        - inventory/group_vars/routeros_switches.yml
+        - inventory/group_vars/opnsense_firewalls.yml
+      when: on_success
     - when: manual
       allow_failure: true
   before_script:
@@ -171,8 +188,27 @@ ansible-discover-network-flows:
 
 ansible-dry-run-lifecycle:
   <<: *default_ssh_ansible_job
-  <<: *rules_test
   stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - site.yml
+        - playbooks/lifecycle/**/*
+        - playbooks/deploy/**/*
+        - roles/compose_repo_deploy/**/*
+        - roles/docker_*/**/*
+        - roles/users/**/*
+        - roles/ssh_hardening/**/*
+        - roles/motd_dynamic/**/*
+        - roles/apt_timers/**/*
+        - roles/k3s_agent_user/**/*
+        - roles/komodo_deploy/**/*
+        - inventory/group_vars/*.yml
+        - inventory/hosts.yml
+        - ansible.cfg
+      when: on_success
+    - when: manual
+      allow_failure: true
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
     - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
