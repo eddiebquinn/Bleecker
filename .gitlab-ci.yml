@@ -112,8 +112,9 @@ ansible-network-discover-state:
   <<: *default_ssh_ansible_job
   stage: discover
   rules:
-    - when: manual
-      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
   artifacts:
     when: always
     paths:
