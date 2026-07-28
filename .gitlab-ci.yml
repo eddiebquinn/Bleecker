@@ -71,11 +71,9 @@ ansible-network-validate:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml --syntax-check
 
 ansible-network-dry-run:
-  <<: *default_ansible_job
+  <<: *default_ssh_ansible_job
+  <<: *rules_test
   stage: test
-  rules:
-    - when: manual
-      allow_failure: true
   before_script:
     - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
     - mkdir -p ~/.ssh .ansible
