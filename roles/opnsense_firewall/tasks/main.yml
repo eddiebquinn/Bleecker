@@ -65,7 +65,7 @@
   ansible.builtin.debug:
     msg: "Firewall rules on device: {{ _fw_rules.json.rows | length if _fw_rules.json is defined and _fw_rules.json.rows is defined else 'unknown' }}"
   delegate_to: localhost
-  when: _fw_rules is defined and _fw_rules.get('json')
+  when: _fw_rules is defined and (_fw_rules.get('json', {}) | length > 0)
 
 # ── 4. NAT Rule Verification ──
 - name: Fetch current NAT rules
