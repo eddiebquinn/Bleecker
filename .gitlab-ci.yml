@@ -133,6 +133,28 @@ ansible-network-discover-state:
   script:
     - ansible-playbook -i inventory/hosts.yml playbooks/network/discover-state.yml -v
 
+ansible-network-apply:
+  <<: *default_ssh_ansible_job
+  stage: apply
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: true
+    - when: never
+  before_script:
+    - test -n "$SSH_PRIVATE_KEY" || (echo "SSH_PRIVATE_KEY is required" && exit 1)
+    - mkdir -p ~/.ssh .ansible
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ci_network_key
+    - chmod 600 ~/.ssh/ci_network_key
+    - export ANSIBLE_PRIVATE_KEY_FILE=~/.ssh/ci_network_key
+    - ssh-keyscan -T 5 -H 10.67.45.2 10.67.45.1 >> .ansible/known_hosts 2>/dev/null || true
+    - export ANSIBLE_HOST_KEY_CHECKING=false
+    - export OPNSENSE_SEMAPHORE_KEY
+    - export OPNSENSE_SEMAPHORE_SECRET
+  script:
+    - ansible-playbook -i inventory/hosts.yml playbooks/network/site.yml
+
 ansible-validate:
   <<: *default_ansible_job
   <<: *rules_validate
