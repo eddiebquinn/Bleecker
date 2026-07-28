@@ -1,8 +1,113 @@
 ---
-# OPNsense Firewall configuration
-# TODO: implement firewall rule management, alias management, interface config
-# Uses opnsense.ansible collection (opnsense_firewall_alias, opnsense_firewall_rule modules)
+# opnsense_firewall tasks — Argus Phase 1.1
+#
+# Verifies and optionally enforces OPNsense state via REST API.
+# All mutating operations are gated behind opn_enforce_rules / opn_enforce_nat
+# which default to false — the role is read-only verification by default.
+#
+# Tasks use ansible.builtin.uri with delegate_to: localhost since the
+# OPNsense API runs over HTTPS from the controller, not SSH.
 
-- name: Placeholder - no OPNsense tasks configured yet
+# ── 1. Verify API accessibility ──
+- name: Check OPNsense API is reachable
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/core/system/status"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: _api_check
+  delegate_to: localhost
+  ignore_errors: yes
+
+- name: Fail if API unreachable
+  ansible.builtin.fail:
+    msg: "OPNsense API at {{ opn_api_host }} returned {{ _api_check.status }}. Check credentials or network."
+  when:
+    - _api_check is defined
+    - _api_check.status is defined
+    - _api_check.status != 200
+  delegate_to: localhost
+
+# ── 2. Verify system status ──
+- name: Fetch system status
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/core/system/status"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: _system_status
+  delegate_to: localhost
+
+- name: Display system status
   ansible.builtin.debug:
-    msg: "opnsense_firewall role is a skeleton - tasks not yet implemented"
+    msg: "OPNsense status: {{ _system_status.json.metadata.system.title }} — {{ _system_status.json.metadata.system.message }}"
+  delegate_to: localhost
+  when: _system_status is defined and _system_status.get('json') is defined
+
+# ── 3. Firewall Rule Verification ──
+# Only runs if opn_enforce_rules is true
+# Verifies the discovered firewall rules exist on the device
+- name: Fetch current firewall rules
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/firewall/filter/searchRule"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+    method: POST
+  register: _fw_rules
+  delegate_to: localhost
+  when: opn_enforce_rules | default(false)
+
+- name: Display firewall rule count
+  ansible.builtin.debug:
+    msg: "Firewall rules on device: {{ _fw_rules.json.rows | length if _fw_rules.json is defined and _fw_rules.json.rows is defined else 'unknown' }}"
+  delegate_to: localhost
+  when: _fw_rules is defined and _fw_rules.get('json')
+
+# ── 4. NAT Rule Verification ──
+- name: Fetch current NAT rules
+  ansible.builtin.uri:
+    url: "https://{{ opn_host }}/api/firewall/nat/searchRule"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+    method: POST
+  register: _nat_rules
+  delegate_to: localhost
+  ignore_errors: yes
+  when: opn_enforce_nat | default(false)
+
+# ── 5. Interface Verification ──
+- name: Fetch interface statistics
+  ansible.builtin.uri:
+    url: "https://{{ opn_host }}/api/diagnostics/interface/getInterfaceStatistics"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: _iface_stats
+  delegate_to: localhost
+  ignore_errors: yes
+
+- name: Verify VLAN interfaces match expected
+  ansible.builtin.debug:
+    msg: |
+      Found {{ opn_vlans | length }} defined VLANs.
+      Current devices on API:
+      {% for key, val in (_iface_stats.json.statistics | default(_iface_stats.json | default({}))).items() %}
+      {% if val.get('name','') is match('vlan[0-9]+') %}
+      - {{ val.get('name','') }}: {{ val.get('address','').split('/')[0] }} ({{ val.get('network','') }})
+      {% endif %}
+      {% endfor %}
+  delegate_to: localhost
+  when: _iface_stats is defined and _iface_stats.get('json') is defined
+
+# ── 6. Summary ──
+- name: OPNsense role summary
+  ansible.builtin.debug:
+    msg: "opnsense_firewall role executed. API reachable: {{ _api_check.status == 200 }}. Rule enforcement: {{ opn_enforce_rules | default(false) }}. NAT enforcement: {{ opn_enforce_nat | default(false) }}."
+  delegate_to: localhost

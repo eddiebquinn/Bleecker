@@ -8,5 +8,8 @@
 - name: Configure OPNsense firewalls
   hosts: opnsense_firewalls
   gather_facts: no
+  connection: local
+  vars:
+    ansible_connection: local
   roles:
     - role: opnsense_firewall
