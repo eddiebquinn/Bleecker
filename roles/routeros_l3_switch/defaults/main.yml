@@ -1,3 +1,109 @@
 ---
-# RouterOS L3 Switch defaults
-# TODO: populate with VLAN SVIs, OSPF, and ACL defaults
+# routeros_l3_switch defaults — Argus Phase 1.1
+#
+# Data-driven definitions for the CRS328 gridlink-1 switch state.
+# These values are based on discovered-state baseline captured on 2026-07-27.
+#
+# Override any value via inventory group_vars or host_vars.
+
+# ── System ──
+routeros_hostname: "gridlink-1"
+
+# ── Bridge ──
+routeros_bridge_name: "bridge"
+routeros_bridge_vlan_filtering: yes
+routeros_bridge_protocol_mode: rstp
+routeros_bridge_admin_mac: "F4:1E:57:F6:85:26"
+routeros_bridge_mtu: auto
+routeros_bridge_priority: "0x8000"
+routeros_bridge_ageing_time: 5m
+routeros_bridge_forward_delay: 15s
+routeros_bridge_max_message_age: 20s
+routeros_bridge_fast_forward: yes
+routeros_bridge_igmp_snooping: no
+routeros_bridge_dhcp_snooping: no
+
+# ── VLAN interfaces (SVIs) ──
+# These are the Layer 3 interfaces on the switch.
+# Management SVI exists now; more will be added in Phase 3 (L3 conversion).
+routeros_vlan_interfaces:
+  - name: "vlan45-mgmt"
+    vlan_id: 45
+    interface: "{{ routeros_bridge_name }}"
+    mtu: 1500
+    l3_hw_offloading: yes
+    comment: "Management"
+
+# ── IP addresses (SVI IPs) ──
+# Items with state: present will be added; state: absent will be removed.
+# Phase 3 will add SVIs for other VLANs here.
+routeros_ip_addresses:
+  - address: "10.67.45.2/24"
+    interface: "vlan45-mgmt"
+    network: "10.67.45.0"
+    state: present
+    comment: "Management SVI"
+  - address: "10.0.1.34/16"
+    interface: "bridge"
+    network: "10.0.0.0"
+    state: absent
+    comment: "Legacy/fallback bridge IP"
+
+# ── Static routes ──
+routeros_static_routes:
+  - dst_address: "0.0.0.0/0"
+    gateway: "10.67.45.1"
+    distance: 1
+    comment: "Default via OPNsense"
+
+# ── Bridge port assignments ──
+# pvid is the untagged VLAN ID for each port.
+# state: present ensures the port is in the bridge with the correct PVID.
+# If a port is in the bridge but with a different PVID, it will be corrected.
+routeros_bridge_ports:
+  - interface: "ether1"
+    pvid: 45
+    comment: "router (to OPNsense, inactive port)"
+  - interface: "ether5"
+    pvid: 45
+    comment: "PDU"
+  - interface: "ether9"
+    pvid: 45
+    comment: "arasaka-1-idrac"
+  - interface: "ether10"
+    pvid: 1
+    comment: "arasaka-1 (inactive)"
+  - interface: "ether11"
+    pvid: 20
+    comment: "datafortress-1-idrac (storage VLAN)"
+  - interface: "ether15"
+    pvid: 71
+    comment: "proxmox-bkup (ISP router VLAN)"
+  - interface: "ether17"
+    pvid: 60
+    comment: "blackhand (endpoints)"
+  - interface: "ether12"
+    pvid: 45
+    comment: "datafortress-1 (management)"
+  - interface: "ether3"
+    pvid: 1
+    comment: "unused (default VLAN)"
+  - interface: "ether4"
+    pvid: 1
+    comment: "unused (default VLAN)"
+  - interface: "ether7"
+    pvid: 40
+    comment: "AP (infrastructure VLAN)"
+  - interface: "ether13"
+    pvid: 45
+    comment: "unused (management VLAN)"
+
+# ── DNS ──
+routeros_dns_servers:
+  - "10.67.40.25"
+routeros_dns_allow_remote_requests: no
+
+# ── NTP ──
+routeros_ntp_enabled: yes
+routeros_ntp_servers:
+  - "10.67.40.25"

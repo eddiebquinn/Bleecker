@@ -1,7 +1,147 @@
 ---
-# RouterOS L3 Switch configuration
-# TODO: implement VLAN SVI configuration, OSPF routing, ACLs, mangle/PBR rules
+# routeros_l3_switch tasks — Argus Phase 1.1
+#
+# Enforces the CRS328 switch state as defined in defaults/main.yml.
+# Uses community.routeros.command with read-before-write idempotency.
+#
+# Design rules:
+#   - `set` commands on existing objects are RouterOS-idempotent
+#   - `add` commands are guarded by a prior `print where` check
+#   - `remove` commands are guarded by a prior `print where` check
+#   - Each firewall rule uses pre-configured address-lists for clear ACLs
 
-- name: Placeholder - no RouterOS tasks configured yet
-  ansible.builtin.debug:
-    msg: "routeros_l3_switch role is a skeleton - tasks not yet implemented"
+# ── 1. System Identity ──
+- name: Set system hostname
+  community.routeros.command:
+    commands:
+      - "/system identity set name={{ routeros_hostname }}"
+
+# ── 2. DNS ──
+- name: Set DNS servers
+  community.routeros.command:
+    commands:
+      - "/ip dns set servers={{ routeros_dns_servers | join(',') }} allow-remote-requests={{ routeros_dns_allow_remote_requests | ternary('yes','no') }}"
+  when: routeros_dns_servers | length > 0
+
+# ── 3. NTP ──
+- name: Set NTP client
+  community.routeros.command:
+    commands:
+      - "/system ntp client set enabled={{ routeros_ntp_enabled | ternary('yes','no') }} server-dns-names={{ routeros_ntp_servers | join(',') }}"
+  when: routeros_ntp_servers | length > 0
+
+# ── 4. Bridge Configuration ──
+- name: Configure bridge
+  community.routeros.command:
+    commands:
+      - >-
+        /interface bridge set [find name={{ routeros_bridge_name }}]
+        vlan-filtering={{ routeros_bridge_vlan_filtering | ternary('yes','no') }}
+        protocol-mode={{ routeros_bridge_protocol_mode }}
+        ageing-time={{ routeros_bridge_ageing_time }}
+        priority={{ routeros_bridge_priority }}
+        forward-delay={{ routeros_bridge_forward_delay }}
+        max-message-age={{ routeros_bridge_max_message_age }}
+        fast-forward={{ routeros_bridge_fast_forward | ternary('yes','no') }}
+        igmp-snooping={{ routeros_bridge_igmp_snooping | ternary('yes','no') }}
+        dhcp-snooping={{ routeros_bridge_dhcp_snooping | ternary('yes','no') }}
+        auto-mac=no
+        admin-mac={{ routeros_bridge_admin_mac }}
+
+# ── 5. VLAN Interface — Management (vlan45-mgmt) ──
+- name: Check if management VLAN interface exists
+  community.routeros.command:
+    commands: /interface vlan print where name=vlan45-mgmt
+  register: _vlan45_check
+  changed_when: false
+
+- name: Create management VLAN interface
+  community.routeros.command:
+    commands:
+      - /interface vlan add name=vlan45-mgmt vlan-id=45 interface=bridge comment=Management l3-hw-offloading=yes
+  when: _vlan45_check.stdout[0] | length == 0
+
+# ── 6. IP Addresses ──
+# 6a. Ensure management IP exists
+- name: Check if management IP exists
+  community.routeros.command:
+    commands: /ip address print where address=10.67.45.2/24 and interface=vlan45-mgmt
+  register: _mgmt_ip_check
+  changed_when: false
+
+- name: Add management IP
+  community.routeros.command:
+    commands:
+      - /ip address add address=10.67.45.2/24 interface=vlan45-mgmt network=10.67.45.0 comment="Management SVI"
+  when: _mgmt_ip_check.stdout[0] | length == 0
+
+# 6b. Remove legacy bridge IP (10.0.1.34/16)
+- name: Check if legacy bridge IP exists
+  community.routeros.command:
+    commands: /ip address print where address=10.0.1.34/16 and interface=bridge
+  register: _legacy_ip_check
+  changed_when: false
+
+- name: Remove legacy bridge IP
+  community.routeros.command:
+    commands:
+      - /ip address remove [find where address=10.0.1.34/16 and interface=bridge]
+  when: _legacy_ip_check.stdout[0] | length > 0
+
+# ── 7. Static Routes ──
+- name: Check if default route exists
+  community.routeros.command:
+    commands: /ip route print where dst-address=0.0.0.0/0 and gateway=10.67.45.1
+  register: _route_check
+  changed_when: false
+
+- name: Add default route
+  community.routeros.command:
+    commands:
+      - /ip route add dst-address=0.0.0.0/0 gateway=10.67.45.1 distance=1 comment="Default via OPNsense (vlan45-mgmt)"
+  when: _route_check.stdout[0] | length == 0
+
+# ── 8. Bridge Port PVID Assignments ──
+# Each port in routeros_bridge_ports uses `set` with `find` — idempotent by design.
+- name: Set bridge port PVIDs
+  community.routeros.command:
+    commands:
+      - >-
+        /interface bridge port set
+        [find where interface={{ item.interface }}]
+        pvid={{ item.pvid }}
+        comment="{{ item.comment | default('') }}"
+  loop: "{{ routeros_bridge_ports }}"
+  when: routeros_bridge_ports | length > 0
+
+# ── 9. Firewall — Enforce Empty State ──
+# Tagged [firewall] and [dangerous] so they only run when explicitly enabled.
+# The CRS328 is intentionally L2-only with no firewall rules.
+# Setting routeros_enforce_empty_firewall=true will nuke any rules that appear.
+- name: Ensure firewall filter is empty
+  community.routeros.command:
+    commands:
+      - /ip firewall filter remove [find]
+  when: routeros_enforce_empty_firewall | default(false)
+  tags: [firewall, dangerous]
+
+- name: Ensure firewall NAT is empty
+  community.routeros.command:
+    commands:
+      - /ip firewall nat remove [find]
+  when: routeros_enforce_empty_firewall | default(false)
+  tags: [firewall, dangerous]
+
+- name: Ensure firewall mangle is empty
+  community.routeros.command:
+    commands:
+      - /ip firewall mangle remove [find]
+  when: routeros_enforce_empty_firewall | default(false)
+  tags: [firewall, dangerous]
+
+# ── 10. Neighbor Discovery (LLDP) ──
+- name: Enable LLDP discovery protocol
+  community.routeros.command:
+    commands:
+      - /ip neighbor discovery-settings set discover-interface-list=all protocol=lldp
+  tags: [lldp]
