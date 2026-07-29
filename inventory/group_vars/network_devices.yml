@@ -5,6 +5,9 @@
 #   - inventory/group_vars/opnsense_firewalls.yml  (OPNsense)
 ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
 
+# Enable Phase 3 L3 routing on CRS328
+routeros_l3_routing_enabled: true
+
 # ── VLAN Topology — Single Source of Truth ──
 # routing_mode: split = benign at switch, red-flag patterns punted to OPNsense
 #               opnsense = ALL traffic through OPNsense
