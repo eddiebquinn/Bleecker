@@ -43,9 +43,10 @@
     - (item.0.stdout_lines | default([])) | length == 0
 
 # ── Phase 3: Assign gateway IPs to each SVI ──
+# Note: can't use ansible.utils.ipaddr filter — netaddr lib missing on CI runner
 - name: Check gateway IP existence
   community.routeros.command:
-    commands: "/ip address print where address={{ item.value.gateway }}/{{ item.value.subnet | ansible.utils.ipaddr('prefix') }}"
+    commands: "/ip address print where address={{ item.value.gateway }}/{{ item.value.subnet | regex_replace('^.*/', '') }}"
   loop: "{{ l3_vlan_topology | dict2items }}"
   register: _ip_check
   changed_when: false
@@ -57,9 +58,9 @@
     commands:
       - >-
         /ip address add
-        address={{ item.1.value.gateway }}/{{ item.1.value.subnet | ansible.utils.ipaddr('prefix') }}
+        address={{ item.1.value.gateway }}/{{ item.1.value.subnet | regex_replace('^.*/', '') }}
         interface=vlan{{ item.1.key }}
-        network={{ item.1.value.subnet | ansible.utils.ipaddr('network') }}
+        network={{ item.1.value.subnet | regex_replace('/\\d+$', '') }}
         comment="{{ item.1.value.name }} gateway SVI"
   loop: "{{ _ip_check.results | default([]) | zip(l3_vlan_topology | dict2items) | list }}"
   when:
