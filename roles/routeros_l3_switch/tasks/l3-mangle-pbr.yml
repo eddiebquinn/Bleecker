@@ -31,6 +31,7 @@
         chain=prerouting
         {% if item.protocol is defined %}protocol={{ item.protocol }}{% endif %}
         {% if item.dst_port is defined %}dst-port={{ item.dst_port }}{% endif %}
+        {% if item.in_interface is defined %}in-interface={{ item.in_interface }}{% endif %}
         {% if item.src_subnet is defined %}src-address={{ item.src_subnet }}{% endif %}
         {% if item.dst_subnet is defined %}dst-address={{ item.dst_subnet }}{% endif %}
         {% if item.dst_address is defined %}dst-address={{ item.dst_address }}{% endif %}
