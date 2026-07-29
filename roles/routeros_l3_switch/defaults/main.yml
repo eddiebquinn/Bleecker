@@ -107,3 +107,13 @@ routeros_dns_allow_remote_requests: no
 routeros_ntp_enabled: yes
 routeros_ntp_servers:
   - "10.67.40.25"
+
+# ── Phase 3: L3 Routing ──
+# Variables passed from group_vars/network_devices.yml via playbook
+l3_vlan_topology: {}
+l3_red_flag_patterns: []
+l3_opnsense_gw: ""
+
+# Toggle to enable L3 routing features (Phase 3).
+# Set to true when you're ready to cut over.
+routeros_l3_routing_enabled: false

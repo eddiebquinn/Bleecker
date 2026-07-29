@@ -1,7 +1,31 @@
 ---
+# Network state management playbook
+#
+# Targets:
+#   - routeros_switches: gridlink-1 (CRS328)
+#   - opnsense_firewalls: blackice-1 (OPNsense)
+#
+# Passes vlan_topology and red_flag_patterns from group_vars/network_devices.yml
+# into the routeros_l3_switch role for Phase 3 L3 routing.
+
 - name: Configure RouterOS switches
   hosts: routeros_switches
   gather_facts: no
+  vars:
+    l3_vlan_topology: "{{ vlan_topology | default({}) }}"
+    l3_red_flag_patterns: "{{ red_flag_patterns | default([]) }}"
+    l3_opnsense_gw: "{{ opnsense_mgmt_ip | default('') }}"
+  pre_tasks:
+    - name: Assert required L3 variables are set
+      ansible.builtin.assert:
+        that:
+          - l3_vlan_topology | length > 0
+          - l3_red_flag_patterns | length > 0
+          - l3_opnsense_gw | length > 0
+        fail_msg: >-
+          vlan_topology, red_flag_patterns, and opnsense_mgmt_ip must be
+          defined in inventory/group_vars/network_devices.yml
+      tags: [l3]
   roles:
     - role: routeros_l3_switch
 

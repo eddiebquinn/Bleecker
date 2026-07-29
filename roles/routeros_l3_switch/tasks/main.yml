@@ -145,3 +145,26 @@
     commands:
       - /ip neighbor discovery-settings set discover-interface-list=all protocol=lldp
   tags: [lldp]
+
+# ══════════════════════════════════════════════════════
+# Phase 3: L3 Routing (toggle-gated)
+# ══════════════════════════════════════════════════════
+# All Phase 3 features are gated behind routeros_l3_routing_enabled.
+# The default is false — set to true in CI variables or group_vars
+# when you're ready to cut over.
+
+- name: Include L3 VLAN SVI tasks
+  ansible.builtin.include_tasks: l3-vlan-svis.yml
+  when: routeros_l3_routing_enabled
+
+- name: Include L3 static route tasks
+  ansible.builtin.include_tasks: l3-routes.yml
+  when: routeros_l3_routing_enabled
+
+- name: Include L3 mangle + PBR tasks
+  ansible.builtin.include_tasks: l3-mangle-pbr.yml
+  when: routeros_l3_routing_enabled
+
+- name: Include L3 firewall ACL tasks
+  ansible.builtin.include_tasks: l3-firewall-acls.yml
+  when: routeros_l3_routing_enabled
