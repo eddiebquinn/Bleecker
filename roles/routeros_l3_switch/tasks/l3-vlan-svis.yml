@@ -51,7 +51,6 @@
   changed_when: false
   when:
     - item.key | int != 45  # Management IP already exists
-    - item.key | int != 71  # ISPRouter VLAN — device answers via DHCP, not static
 
 - name: Assign gateway IPs to SVIs
   community.routeros.command:
@@ -65,5 +64,4 @@
   loop: "{{ _ip_check.results | default([]) | zip(l3_vlan_topology | dict2items) | list }}"
   when:
     - item.1.key | int != 45
-    - item.1.key | int != 71
     - (item.0.stdout_lines | default([])) | length == 0

@@ -1,0 +1,48 @@
+---
+# L3 Static Routes — Phase 3: Argus selective routing
+#
+# Ensures the CRS328 has explicit static routes for OPNsense-routed
+# VLANs (DMZ, Management) pointing through OPNsense (10.67.45.1).
+# Without these, the switch might try to route locally to these
+# subnets if they appear as connected routes.
+#
+# Also adds routes for any VLAN the switch shouldn't route directly.
+
+- name: Assert required variables
+  ansible.builtin.assert:
+    that:
+      - l3_vlan_topology is defined
+      - l3_opnsense_gw is defined
+    fail_msg: "l3_vlan_topology and l3_opnsense_gw must be defined"
+
+# ── Routes for OPNsense-routed VLANs ──
+# VLANs with routing_mode: opnsense (DMZ, Management) need explicit
+# routes through OPNsense so the switch knows to punt traffic there.
+
+- name: Add routes for OPNsense-routed VLANs via OPNsense
+  community.routeros.command:
+    commands:
+      - >-
+        /ip route add
+        dst-address={{ item.value.subnet }}
+        gateway={{ l3_opnsense_gw }}
+        comment="Routed via OPNsense: {{ item.value.name }}"
+  loop: "{{ l3_vlan_topology | dict2items | selectattr('value.routing_mode', 'equalto', 'opnsense') | list }}"
+  register: _opnsense_routes
+  changed_when: "'already have' not in (_opnsense_routes.stdout | default(''))"
+  when: item.key | int != 45  # Don't add route for Management — it's the source of the default gateway
+
+# ── Default route via OPNsense ──
+# This already exists in tasks/main.yml as part of the base role.
+# This task is idempotent (add only if missing).
+- name: Ensure default route via OPNsense
+  community.routeros.command:
+    commands: /ip route print where dst-address=0.0.0.0/0 and gateway={{ l3_opnsense_gw }}
+  register: _default_route_check
+  changed_when: false
+
+- name: Add default route if missing
+  community.routeros.command:
+    commands:
+      - "/ip route add dst-address=0.0.0.0/0 gateway={{ l3_opnsense_gw }} distance=1 comment=\"Default via OPNsense\""
+  when: (_default_route_check.stdout_lines | default([])) | length == 0

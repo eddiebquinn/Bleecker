@@ -157,6 +157,10 @@
   ansible.builtin.include_tasks: l3-vlan-svis.yml
   when: routeros_l3_routing_enabled
 
+- name: Include L3 static route tasks
+  ansible.builtin.include_tasks: l3-routes.yml
+  when: routeros_l3_routing_enabled
+
 - name: Include L3 mangle + PBR tasks
   ansible.builtin.include_tasks: l3-mangle-pbr.yml
   when: routeros_l3_routing_enabled

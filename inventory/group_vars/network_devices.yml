@@ -52,8 +52,8 @@ vlan_topology:
     routing_mode: switch
   71:
     name: ISPRouter
-    subnet: 10.67.81.0/24
-    gateway: 10.67.81.1
+    subnet: 10.67.71.0/24
+    gateway: 10.67.71.1
     routing_mode: switch
 
 # OPNsense management IP — used as default route nexthop and PBR target

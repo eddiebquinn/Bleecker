@@ -98,10 +98,10 @@
 - name: Add ISPRouter internet ACLs
   community.routeros.command:
     commands:
-      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=!10.0.0.0/8 dst-address=!172.16.0.0/12 dst-address=!192.168.0.0/16 action=accept comment=\"Argus: ISPRouter→Internet\""
-      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=10.0.0.0/8 action=drop comment=\"Argus: ISPRouter→RFC1918\""
-      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=172.16.0.0/12 action=drop comment=\"Argus: ISPRouter→RFC1918 (172)\""
-      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=192.168.0.0/16 action=drop comment=\"Argus: ISPRouter→RFC1918 (192)\""
+      - "/ip firewall filter add chain=forward src-address=10.67.71.0/24 dst-address=!10.0.0.0/8 dst-address=!172.16.0.0/12 dst-address=!192.168.0.0/16 action=accept comment=\"Argus: ISPRouter→Internet\""
+      - "/ip firewall filter add chain=forward src-address=10.67.71.0/24 dst-address=10.0.0.0/8 action=drop comment=\"Argus: ISPRouter→RFC1918\""
+      - "/ip firewall filter add chain=forward src-address=10.67.71.0/24 dst-address=172.16.0.0/12 action=drop comment=\"Argus: ISPRouter→RFC1918 (172)\""
+      - "/ip firewall filter add chain=forward src-address=10.67.71.0/24 dst-address=192.168.0.0/16 action=drop comment=\"Argus: ISPRouter→RFC1918 (192)\""
   register: _r9
   changed_when: "'already have' not in (_r9.stdout | default(''))"
 
