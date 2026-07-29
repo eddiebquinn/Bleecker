@@ -67,7 +67,7 @@ red_flag_patterns:
     description: SSH
   - protocol: udp
     dst_port: 53
-    in_interface: "!vlan45"
+    in_interface: "!ether1"
     description: DNS
   - protocol: icmp
     description: ICMP/Ping
