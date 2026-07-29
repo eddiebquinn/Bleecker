@@ -80,6 +80,8 @@ red_flag_patterns:
   # Subnet-based: entire VLANs that route through OPNsense
   - src_subnet: 10.67.30.0/24
     description: DMZ source (all traffic)
+  - dst_subnet: 10.67.30.0/24
+    description: DMZ destination (all traffic)
   - dst_subnet: 10.67.45.0/24
     description: Management destination (all traffic)
 
