@@ -98,3 +98,30 @@ red_flag_patterns:
     protocol: tcp
     dst_port: 389,636
     description: To Authentik LDAP
+
+# ── OPNsense static routes for switch-routed VLAN return traffic ──
+# When OPNsense VLAN IPs are removed after cutover, OPNsense needs
+# static routes back to each switch-routed subnet via the CRS328.
+# Without these, outbound traffic works but return packets are dropped.
+opnsense_static_routes:
+  - target: "10.67.10.0/24"
+    gateway: "10.67.45.2"
+    description: "Services return route via CRS328"
+  - target: "10.67.20.0/24"
+    gateway: "10.67.45.2"
+    description: "Storage return route via CRS328"
+  - target: "10.67.40.0/24"
+    gateway: "10.67.45.2"
+    description: "Infrastructure return route via CRS328"
+  - target: "10.67.50.0/24"
+    gateway: "10.67.45.2"
+    description: "Guest return route via CRS328"
+  - target: "10.67.60.0/24"
+    gateway: "10.67.45.2"
+    description: "Endpoints return route via CRS328"
+  - target: "10.67.70.0/24"
+    gateway: "10.67.45.2"
+    description: "IoT return route via CRS328"
+  - target: "10.67.71.0/24"
+    gateway: "10.67.45.2"
+    description: "ISPRouter return route via CRS328"

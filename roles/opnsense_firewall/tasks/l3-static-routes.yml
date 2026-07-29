@@ -1,0 +1,94 @@
+---
+# L3 OPNsense static routes — Phase 3: Argus selective routing
+#
+# Adds static routes on OPNsense for switch-routed VLAN return traffic.
+# Without these, OPNsense can forward traffic out via CRS328 but has
+# no route back for return packets — switch-routed VLANs lose internet.
+#
+# Uses the OPNsense routes API: /api/routes/static_route/
+#
+# Gated behind opn_enforce_routes (default: true) so it only runs
+# when explicitly enabled for the cutover.
+
+- name: Assert required variables
+  ansible.builtin.assert:
+    that:
+      - opnsense_static_routes is defined
+      - opn_api_host is defined
+      - opn_api_key is defined
+      - opn_api_secret is defined
+    fail_msg: "opnsense_static_routes and OPNsense API credentials must be defined"
+
+# ── 1. Ensure CRS328 gateway exists on OPNsense ──
+- name: Check if CRS328 gateway exists
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/routes/gateway/searchItem"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: _gateway_check
+  delegate_to: localhost
+
+- name: Add CRS328 gateway if missing
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/routes/gateway/addItem"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+    method: POST
+    body_format: json
+    body:
+      gateway:
+        enabled: "1"
+        name: "CRS328_GW"
+        interface: "lan"
+        gateway: "10.67.45.2"
+        default: "0"
+        disabled: "0"
+        monitor_disabled: "1"
+  delegate_to: localhost
+  when: _gateway_check.json is defined and _gateway_check.json.total | default(0) == 0
+
+# ── 2. Add static routes for each switch-routed subnet ──
+- name: Check existing static routes
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/routes/static_route/searchItem"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: _routes_check
+  delegate_to: localhost
+
+- name: Add static routes for switch-routed subnets
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/routes/static_route/addItem"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+    method: POST
+    body_format: json
+    body:
+      static_route:
+        enabled: "1"
+        network: "{{ item.target }}"
+        gateway: "CRS328_GW"
+        descr: "{{ item.description }}"
+  loop: "{{ opnsense_static_routes }}"
+  delegate_to: localhost
+  when: opn_enforce_routes | default(true)
+
+# ── 3. Apply route changes ──
+- name: Apply route configuration
+  ansible.builtin.uri:
+    url: "https://{{ opn_api_host }}/api/routes/static_route/reconfigure"
+    url_username: "{{ opn_api_key }}"
+    url_password: "{{ opn_api_secret }}"
+    force_basic_auth: yes
+    validate_certs: no
+    method: POST
+  delegate_to: localhost
+  when: opn_enforce_routes | default(true)

@@ -109,5 +109,10 @@
 # ── 6. Summary ──
 - name: OPNsense role summary
   ansible.builtin.debug:
-    msg: "opnsense_firewall role executed. API reachable: {{ (_api_check.status | default('check-mode')) == 200 }}. Rule enforcement: {{ opn_enforce_rules | default(false) }}. NAT enforcement: {{ opn_enforce_nat | default(false) }}."
+    msg: "opnsense_firewall role executed. API reachable: {{ (_api_check.status | default('check-mode')) == 200 }}. Rule enforcement: {{ opn_enforce_rules | default(false) }}. NAT enforcement: {{ opn_enforce_nat | default(false) }}. Routes enforcement: {{ opn_enforce_routes | default(true) }}."
   delegate_to: localhost
+
+# ── 7. L3 Static Routes (Phase 3) ──
+- name: Include L3 static route tasks
+  ansible.builtin.include_tasks: l3-static-routes.yml
+  when: opn_enforce_routes | default(true)
