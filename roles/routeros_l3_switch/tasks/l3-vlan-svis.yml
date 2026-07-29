@@ -32,10 +32,10 @@
     commands:
       - >-
         /interface vlan add
-        name=vlan{{ item.0.key }}
-        vlan-id={{ item.0.key }}
+        name=vlan{{ item.1.key }}
+        vlan-id={{ item.1.key }}
         interface=bridge
-        comment={{ item.0.value.name }}
+        comment={{ item.1.value.name }}
         l3-hw-offloading=yes
   loop: "{{ _vlan_check.results | default([]) | zip(l3_vlan_topology | dict2items) | list }}"
   when:
