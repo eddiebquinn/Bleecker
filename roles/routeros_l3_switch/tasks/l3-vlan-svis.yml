@@ -1,0 +1,69 @@
+---
+# L3 VLAN SVIs — Phase 3: Argus selective routing
+#
+# Creates VLAN interfaces (SVIs) on the CRS328 bridge and assigns
+# gateway IPs for each VLAN. Only creates SVIs for VLANs where the
+# switch needs to route (all VLANs get SVIs — OPNsense-routed VLANs
+# still need an SVI so the CRS328 can route catch-and-punt traffic
+# to OPNsense and accept return traffic).
+#
+# The existing management SVI (vlan45-mgmt) is managed in tasks/main.yml
+# and is NOT touched here — this file handles all Phase 3 SVIs.
+
+- name: Assert required variables
+  ansible.builtin.assert:
+    that:
+      - l3_vlan_topology is defined
+      - l3_vlan_topology | length > 0
+    fail_msg: "l3_vlan_topology must be defined (from group_vars/network_devices.yml)"
+  run_once: true
+
+# ── Phase 3: Create VLAN SVIs for each topology entry ──
+- name: Check VLAN interface existence
+  community.routeros.command:
+    commands: "/interface vlan print where vlan-id={{ item.key }}"
+  loop: "{{ l3_vlan_topology | dict2items }}"
+  register: _vlan_check
+  changed_when: false
+  when: item.key | int != 45  # Management SVI already exists
+
+- name: Create VLAN SVIs
+  community.routeros.command:
+    commands:
+      - >-
+        /interface vlan add
+        name=vlan{{ item.0.key }}
+        vlan-id={{ item.0.key }}
+        interface=bridge
+        comment={{ item.0.value.name }}
+        l3-hw-offloading=yes
+  loop: "{{ _vlan_check.results | default([]) | zip(l3_vlan_topology | dict2items) | list }}"
+  when:
+    - item.1.key | int != 45
+    - (item.0.stdout_lines | default([])) | length == 0
+
+# ── Phase 3: Assign gateway IPs to each SVI ──
+- name: Check gateway IP existence
+  community.routeros.command:
+    commands: "/ip address print where address={{ item.value.gateway }}/{{ item.value.subnet | ansible.utils.ipaddr('prefix') }}"
+  loop: "{{ l3_vlan_topology | dict2items }}"
+  register: _ip_check
+  changed_when: false
+  when:
+    - item.key | int != 45  # Management IP already exists
+    - item.key | int != 71  # ISPRouter VLAN — device answers via DHCP, not static
+
+- name: Assign gateway IPs to SVIs
+  community.routeros.command:
+    commands:
+      - >-
+        /ip address add
+        address={{ item.1.value.gateway }}/{{ item.1.value.subnet | ansible.utils.ipaddr('prefix') }}
+        interface=vlan{{ item.1.key }}
+        network={{ item.1.value.subnet | ansible.utils.ipaddr('network') }}
+        comment="{{ item.1.value.name }} gateway SVI"
+  loop: "{{ _ip_check.results | default([]) | zip(l3_vlan_topology | dict2items) | list }}"
+  when:
+    - item.1.key | int != 45
+    - item.1.key | int != 71
+    - (item.0.stdout_lines | default([])) | length == 0

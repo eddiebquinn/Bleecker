@@ -1,0 +1,114 @@
+---
+# L3 Firewall ACLs — Phase 3: Argus selective routing
+#
+# Implements the inter-VLAN ACLs for switch-routed "benign" flows.
+# Uses the following order:
+#   1. Catch-and-punt: unmatched traffic → OPNsense for inspection
+#   2. Known benign flows → accept (wire speed, ASIC-offloaded)
+#   3. Internet-only VLANs (Guest, IoT, ISPRouter) → allow WAN, block RFC1918
+#   4. Safety net drop: anything the catch-and-punt missed
+#
+# Stale rules matching these comment patterns are removed on enforce runs.
+
+- name: Assert required variables
+  ansible.builtin.assert:
+    that:
+      - l3_vlan_topology is defined
+    fail_msg: "l3_vlan_topology must be defined"
+
+# ── 1. Catch-and-punt: unmatched inter-VLAN → OPNsense ──
+- name: Add catch-and-punt rule
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall filter add
+        chain=forward
+        action=mark-routing
+        new-routing-mark=to-opnsense
+        passthrough=no
+        log=yes
+        comment="Argus: Catch-and-punt unmatched -> OPNsense"
+  register: _catch_punt
+  changed_when: "'already have' not in (_catch_punt.stdout | default(''))"
+
+# ── 2. Known benign flows ──
+- name: Add switch ACL for Endpoints → Services
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.60.0/24 dst-address=10.67.10.0/24 protocol=tcp dst-port=80,443 action=accept comment=\"Argus: Endpoints→Services HTTP/HTTPS\""
+  register: _r1
+  changed_when: "'already have' not in (_r1.stdout | default(''))"
+
+- name: Add switch ACL for Endpoints → Storage
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.60.0/24 dst-address=10.67.20.0/24 protocol=tcp dst-port=443,445,2049 action=accept comment=\"Argus: Endpoints→Storage (SMB/NFS/Web)\""
+  register: _r2
+  changed_when: "'already have' not in (_r2.stdout | default(''))"
+
+- name: Add switch ACL for Services → Storage
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.10.0/24 dst-address=10.67.20.0/24 protocol=tcp dst-port=443,445,2049,3260 action=accept comment=\"Argus: Services→Storage\""
+  register: _r3
+  changed_when: "'already have' not in (_r3.stdout | default(''))"
+
+- name: Add switch ACL for Services → Infrastructure
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.10.0/24 dst-address=10.67.40.0/24 protocol=tcp dst-port=80,443,8080 action=accept comment=\"Argus: Services→Infrastructure\""
+  register: _r4
+  changed_when: "'already have' not in (_r4.stdout | default(''))"
+
+- name: Add switch ACL for Infrastructure → Services
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.40.0/24 dst-address=10.67.10.0/24 protocol=tcp dst-port=22,80,443,8080,9100,9120 action=accept comment=\"Argus: Infrastructure→Services (deploys, monitoring)\""
+  register: _r5
+  changed_when: "'already have' not in (_r5.stdout | default(''))"
+
+- name: Add switch ACL for Infrastructure → Storage
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.40.0/24 dst-address=10.67.20.0/24 protocol=tcp dst-port=445,2049 action=accept comment=\"Argus: Infrastructure→Storage (dbackup)\""
+  register: _r6
+  changed_when: "'already have' not in (_r6.stdout | default(''))"
+
+# ── 3. Internet-only VLANs (Guest, IoT, ISPRouter) ──
+- name: Add Guest internet ACLs
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.50.0/24 dst-address=!10.0.0.0/8 dst-address=!172.16.0.0/12 dst-address=!192.168.0.0/16 action=accept comment=\"Argus: Guest→Internet\""
+      - "/ip firewall filter add chain=forward src-address=10.67.50.0/24 dst-address=10.0.0.0/8 action=drop comment=\"Argus: Guest→RFC1918\""
+      - "/ip firewall filter add chain=forward src-address=10.67.50.0/24 dst-address=172.16.0.0/12 action=drop comment=\"Argus: Guest→RFC1918 (172)\""
+      - "/ip firewall filter add chain=forward src-address=10.67.50.0/24 dst-address=192.168.0.0/16 action=drop comment=\"Argus: Guest→RFC1918 (192)\""
+  register: _r7
+  changed_when: "'already have' not in (_r7.stdout | default(''))"
+
+- name: Add IoT internet ACLs
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.70.0/24 dst-address=!10.0.0.0/8 dst-address=!172.16.0.0/12 dst-address=!192.168.0.0/16 action=accept comment=\"Argus: IoT→Internet\""
+      - "/ip firewall filter add chain=forward src-address=10.67.70.0/24 dst-address=10.0.0.0/8 action=drop comment=\"Argus: IoT→RFC1918\""
+      - "/ip firewall filter add chain=forward src-address=10.67.70.0/24 dst-address=172.16.0.0/12 action=drop comment=\"Argus: IoT→RFC1918 (172)\""
+      - "/ip firewall filter add chain=forward src-address=10.67.70.0/24 dst-address=192.168.0.0/16 action=drop comment=\"Argus: IoT→RFC1918 (192)\""
+  register: _r8
+  changed_when: "'already have' not in (_r8.stdout | default(''))"
+
+- name: Add ISPRouter internet ACLs
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=!10.0.0.0/8 dst-address=!172.16.0.0/12 dst-address=!192.168.0.0/16 action=accept comment=\"Argus: ISPRouter→Internet\""
+      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=10.0.0.0/8 action=drop comment=\"Argus: ISPRouter→RFC1918\""
+      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=172.16.0.0/12 action=drop comment=\"Argus: ISPRouter→RFC1918 (172)\""
+      - "/ip firewall filter add chain=forward src-address=10.67.81.0/24 dst-address=192.168.0.0/16 action=drop comment=\"Argus: ISPRouter→RFC1918 (192)\""
+  register: _r9
+  changed_when: "'already have' not in (_r9.stdout | default(''))"
+
+# ── 4. Safety net — should never hit (catch-and-punt catches first) ──
+- name: Add safety net default deny
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter add chain=forward action=drop comment=\"Argus: Safety net default deny (catch-and-punt catches first)\""
+  register: _r_drop
+  changed_when: "'already have' not in (_r_drop.stdout | default(''))"

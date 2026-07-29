@@ -1,0 +1,69 @@
+---
+# L3 Mangle + PBR — Phase 3: Argus selective routing
+#
+# Configures RouterOS firewall mangle rules that mark red-flag traffic
+# with the 'to-opnsense' routing mark, and a PBR route that forwards
+# marked traffic to OPNsense (10.67.45.1) for full firewall inspection.
+#
+# This file manages the ruleset as the single source of truth.
+# Any rules NOT in the pattern list will be removed during enforcement.
+
+- name: Assert required variables
+  ansible.builtin.assert:
+    that:
+      - l3_red_flag_patterns is defined
+      - l3_opnsense_gw is defined
+    fail_msg: "l3_red_flag_patterns and l3_opnsense_gw must be defined"
+
+# ── 1. Add/get-to-state: mangle rules ──
+- name: Check existing mangle rules
+  community.routeros.command:
+    commands: "/ip firewall mangle print detail"
+  register: _existing_mangle
+  changed_when: false
+
+# Build the add command per pattern
+- name: Add mangle rules for red-flag patterns
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall mangle add
+        chain=prerouting
+        {% if item.protocol is defined %}protocol={{ item.protocol }}{% endif %}
+        {% if item.dst_port is defined %}dst-port={{ item.dst_port }}{% endif %}
+        {% if item.src_subnet is defined %}src-address={{ item.src_subnet }}{% endif %}
+        {% if item.dst_subnet is defined %}dst-address={{ item.dst_subnet }}{% endif %}
+        {% if item.dst_address is defined %}dst-address={{ item.dst_address }}{% endif %}
+        action=mark-routing
+        new-routing-mark=to-opnsense
+        passthrough=yes
+        comment="Punt {{ item.description }} to OPNsense"
+  loop: "{{ l3_red_flag_patterns }}"
+  register: _add_mangle
+  changed_when: "'already have' not in (_add_mangle.stdout | default(''))"
+
+# ── 2. Ensure PBR route exists ──
+- name: Check if PBR route exists
+  community.routeros.command:
+    commands: "/ip route print where routing-mark=to-opnsense"
+  register: _pbr_route_check
+  changed_when: false
+
+- name: Add PBR route for marked traffic
+  community.routeros.command:
+    commands:
+      - "/ip route add dst-address=0.0.0.0/0 gateway={{ l3_opnsense_gw }} routing-mark=to-opnsense comment=\"PBR: marked traffic -> OPNsense\""
+  when: (_pbr_route_check.stdout_lines | default([])) | length == 0
+
+# ── 3. Remove stale mangle rules (enforcement) ──
+- name: Remove mangle rules not matching current patterns
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall mangle remove
+        [find where comment!=\"{{ _keep_comments | join('\" and comment!=\"') }}\"
+        and comment~\"^Punt .* to OPNsense$\"]
+  vars:
+    _keep_comments: "{{ l3_red_flag_patterns | map(attribute='description') | map('regex_replace', '^(.*)$', 'Punt \\1 to OPNsense') | list }}"
+  when: l3_routeros_enforce_mangle | default(false)
+  tags: [enforce]

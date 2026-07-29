@@ -4,3 +4,91 @@
 #   - inventory/group_vars/routeros_switches.yml  (CRS328)
 #   - inventory/group_vars/opnsense_firewalls.yml  (OPNsense)
 ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
+
+# ── VLAN Topology — Single Source of Truth ──
+# routing_mode: split = benign at switch, red-flag patterns punted to OPNsense
+#               opnsense = ALL traffic through OPNsense
+#               switch = internet-only via switch ACLs
+vlan_topology:
+  10:
+    name: Services
+    subnet: 10.67.10.0/24
+    gateway: 10.67.10.1
+    routing_mode: split
+  20:
+    name: Storage
+    subnet: 10.67.20.0/24
+    gateway: 10.67.20.1
+    routing_mode: split
+  30:
+    name: DMZ
+    subnet: 10.67.30.0/24
+    gateway: 10.67.30.1
+    routing_mode: opnsense
+  40:
+    name: Infrastructure
+    subnet: 10.67.40.0/24
+    gateway: 10.67.40.1
+    routing_mode: split
+  45:
+    name: Management
+    subnet: 10.67.45.0/24
+    gateway: 10.67.45.1
+    routing_mode: opnsense
+  50:
+    name: Guest
+    subnet: 10.67.50.0/24
+    gateway: 10.67.50.1
+    routing_mode: switch
+  60:
+    name: Endpoints
+    subnet: 10.67.60.0/24
+    gateway: 10.67.60.1
+    routing_mode: split
+  70:
+    name: IoT
+    subnet: 10.67.70.0/24
+    gateway: 10.67.70.1
+    routing_mode: switch
+  71:
+    name: ISPRouter
+    subnet: 10.67.81.0/24
+    gateway: 10.67.81.1
+    routing_mode: switch
+
+# OPNsense management IP — used as default route nexthop and PBR target
+opnsense_mgmt_ip: 10.67.45.1
+
+# Red-flag patterns — punted to OPNsense via mangle + PBR
+red_flag_patterns:
+  # Port-based: protocols/ports that always get inspected
+  - protocol: tcp
+    dst_port: 22
+    description: SSH
+  - protocol: udp
+    dst_port: 53
+    description: DNS
+  - protocol: icmp
+    description: ICMP/Ping
+  - protocol: udp
+    dst_port: 161,162
+    description: SNMP
+  - protocol: tcp
+    dst_port: 389,636,88,464
+    description: LDAP/Kerberos
+
+  # Subnet-based: entire VLANs that route through OPNsense
+  - src_subnet: 10.67.30.0/24
+    description: DMZ source (all traffic)
+  - dst_subnet: 10.67.45.0/24
+    description: Management destination (all traffic)
+
+  # Host-based: identity plane (Authentik)
+  - dst_address: 10.67.40.25
+    protocol: tcp
+    dst_port: 443,9000,9001
+    description: To Authentik HTTPS/API
+  - dst_address: 10.67.40.25
+    protocol: tcp
+    dst_port: 389,636
+    description: To Authentik LDAP
