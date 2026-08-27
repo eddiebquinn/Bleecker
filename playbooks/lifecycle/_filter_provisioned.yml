@@ -1,0 +1,59 @@
+---
+# Pre-flight: enumerate hosts that have already been provisioned and write
+# the list to /tmp/ansible_provisioned.txt. Consumed by
+# ansible-dry-run-lifecycle (and any other job that wants to skip
+# unprovisioned hosts).
+#
+# A host is considered provisioned when /etc/markers/provisioned exists
+# on it. This is the same marker that 10-provision.yml writes at the end
+# of a successful bootstrap run.
+#
+# The output file is a newline-delimited host list. The CI job joins it
+# with ':' to form the --limit value for ansible-playbook.
+#
+# Mirrors the host-list construction in 00-detect.yml but writes the
+# result to a stable path for CI consumption.
+- name: Filter managed hosts to those already provisioned
+  hosts: managed
+  gather_facts: false
+  ignore_unreachable: true
+
+  vars:
+    filter_targets_expanded: "{{ query('inventory_hostnames', 'managed') }}"
+
+  tasks:
+    - name: Check provision marker
+      ansible.builtin.stat:
+        path: "{{ provision_marker_path }}"
+      register: prov_marker
+      failed_when: false
+      changed_when: false
+
+    - name: Record provision state
+      ansible.builtin.set_fact:
+        provision_marker_exists: "{{ prov_marker.stat.exists | default(false) | bool }}"
+
+    - name: Build provisioned host list
+      ansible.builtin.set_fact:
+        provisioned_targets: >-
+          {{
+            filter_targets_expanded
+            | select('match', '.*')
+            | list
+          }}
+
+    - name: Write provisioned host list (delegated to localhost)
+      ansible.builtin.copy:
+        dest: /tmp/ansible_provisioned.txt
+        mode: '0644'
+        content: |-
+          {%- set ns = namespace(hosts=[]) -%}
+          {%- for host in filter_targets_expanded -%}
+          {%-   if hostvars[host].provision_marker_exists | default(false) -%}
+          {%-     set _ = ns.hosts.append(host) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ ns.hosts | join('\n') }}{%- if ns.hosts | length > 0 -%}
+          {%- endif -%}
+      delegate_to: localhost
+      run_once: true
