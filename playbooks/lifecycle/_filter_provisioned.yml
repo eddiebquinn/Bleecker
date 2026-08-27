@@ -33,27 +33,10 @@
       ansible.builtin.set_fact:
         provision_marker_exists: "{{ prov_marker.stat.exists | default(false) | bool }}"
 
-    - name: Build provisioned host list
-      ansible.builtin.set_fact:
-        provisioned_targets: >-
-          {{
-            filter_targets_expanded
-            | select('match', '.*')
-            | list
-          }}
-
     - name: Write provisioned host list (delegated to localhost)
       ansible.builtin.copy:
         dest: /tmp/ansible_provisioned.txt
         mode: '0644'
-        content: |-
-          {%- set ns = namespace(hosts=[]) -%}
-          {%- for host in filter_targets_expanded -%}
-          {%-   if hostvars[host].provision_marker_exists | default(false) -%}
-          {%-     set _ = ns.hosts.append(host) -%}
-          {%-   endif -%}
-          {%- endfor -%}
-          {{ ns.hosts | join('\n') }}{%- if ns.hosts | length > 0 -%}
-          {%- endif -%}
+        content: "{% for host in filter_targets_expanded %}{% if hostvars[host].provision_marker_exists | default(false) %}{{ host }}\n{% endif %}{% endfor %}"
       delegate_to: localhost
       run_once: true
