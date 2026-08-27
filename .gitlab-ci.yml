@@ -244,7 +244,13 @@ ansible-dry-run-lifecycle:
     - when: never
   before_script:
     - source .ci/ci_prepare_ssh.sh TARGET_HOSTS
-    - 'export RESOLVED_TARGETS=$(paste -sd":" /tmp/ansible_target_names.txt)'
+    # Filter managed to hosts that have /etc/markers/provisioned. Without
+    # this, --check on a fresh host runs against docker_packages and
+    # other post-provision roles that aren't installed yet, producing
+    # failures that aren't actionable from the dry-run alone.
+    - ansible-playbook -i inventory/hosts.yml playbooks/lifecycle/_filter_provisioned.yml
+    - 'export PROVISIONED_TARGETS=$(paste -sd":" /tmp/ansible_provisioned.txt)'
+    - 'export RESOLVED_TARGETS=$PROVISIONED_TARGETS'
     - |
       if [ "${DOCKER_REGISTRY_AUTH_ENABLED:-}" = "true" ]; then
         test -n "${DOCKER_REGISTRY_AUTH_REGISTRY:-}" || (echo "DOCKER_REGISTRY_AUTH_REGISTRY is required when DOCKER_REGISTRY_AUTH_ENABLED=true" && exit 1)
@@ -255,8 +261,8 @@ ansible-dry-run-lifecycle:
         printf '%s\n' '{"docker_registry_auth_enabled": false}' > /tmp/docker-registry-auth-vars.json
       fi
   script:
-    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$RESOLVED_TARGETS" -e @/tmp/docker-registry-auth-vars.json
-
+    - test -n "$PROVISIONED_TARGETS" || (echo "No provisioned hosts in managed group - dry-run has nothing to check. Provision at least one host first." && exit 0)
+    - ansible-playbook -i inventory/hosts.yml site.yml --check --diff --limit "$PROVISIONED_TARGETS" --user "$ANSIBLE_USER" --private-key ~/.ssh/ci_ansible_key -e @/tmp/docker-registry-auth-vars.json
 ansible-provision-hosts:
   <<: *default_ansible_job
   <<: *rules_manual_apply
