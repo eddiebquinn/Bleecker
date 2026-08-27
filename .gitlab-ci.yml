@@ -114,6 +114,10 @@ ansible-network-discover-state:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
+      # allow_failure so a network device timeout doesn't take down the
+      # whole pipeline and block downstream apply jobs (lifecycle, etc.).
+      # The artifact is still uploaded for triage.
+      allow_failure: true
     - when: never
   artifacts:
     when: always
