@@ -66,7 +66,11 @@
   when:
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
-    - docker_apt_repo_config is changed
+  # Run unconditionally (not gated on `docker_apt_repo_config is changed`).
+  # Without this, --check mode never refreshes the cache, so the subsequent
+  # "Check Docker CE package candidate availability" task runs against the
+  # pre-apply cache and reports a false-negative "no candidate" for any
+  # host that doesn't already have docker-ce installed.
 
 - name: Check Docker CE package candidate availability
   ansible.builtin.command: apt-cache policy docker-ce
