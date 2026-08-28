@@ -91,6 +91,10 @@
     - docker_manage_packages | bool
     - ansible_facts.os_family == "Debian"
     - "'Candidate: (none)' in (docker_ce_policy.stdout | default(''))"
+    # In --check mode, the preceding `copy` task does not write the apt
+    # source file, so the policy check reports no candidate even when a real
+    # apply would succeed. Skip the failure under --check.
+    - not ansible_check_mode
 
 - name: Install standard Docker packages
   ansible.builtin.apt:
