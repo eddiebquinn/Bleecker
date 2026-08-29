@@ -1,0 +1,7 @@
+---
+- import_playbook: _app.yml
+  vars:
+    compose_app_name: relic
+    compose_vars_prefix: relic
+    compose_repo_label: Relic
+    compose_git_base_url: "ssh://git@gitlab-ssh.eddiequinn.casa:2424/my-blog"
