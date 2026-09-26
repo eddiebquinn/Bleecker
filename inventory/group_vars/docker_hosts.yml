@@ -27,15 +27,6 @@ docker_daemon_config:
   registry-mirrors:
     - "http://cache-proxies.infra.local.eddiequinn.casa:5000"
     - "http://cache-proxies.infra.local.eddiequinn.casa:5001"
-  # Container DNS: docker's embedded resolver (127.0.0.11) fails to forward
-  # on docker hosts (breakage dating ~Jul 2026 — forced RPZ disable in
-  # bind9 e79d6557, and every bind9 deploy build failure since Aug 27).
-  # Pin the embedded DNS upstream to infstack-1's bind9 so runtime
-  # containers and build sandboxes resolve via the LAN resolver instead
-  # of the broken host-resolv.conf copy. Intentionally single resolver —
-  # OPNsense Unbound (10.67.45.1) deliberately NOT used as a fallback.
-  dns:
-    - "10.67.40.25"
 
 # Cloudflare Utils vars
 
